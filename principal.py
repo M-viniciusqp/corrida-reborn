@@ -50,8 +50,9 @@ def main():
                     help="velocidade base desta corrida (0..1), sem mexer no config.py")
     a = ap.parse_args()
     if a.vel is not None:
-        config.VELOCIDADE_BASE = max(0.0, min(1.0, a.vel))
-        config.VELOCIDADE_MIN = min(config.VELOCIDADE_MIN, config.VELOCIDADE_BASE)
+        config.VELOCIDADE_BASE = max(config.VELOCIDADE_MIN, min(1.0, a.vel))   # nunca abaixo do piso
+        if a.vel < config.VELOCIDADE_MIN:
+            print(f"(--vel {a.vel:.2f} esta abaixo do piso {config.VELOCIDADE_MIN:.2f}: usando o piso)")
         print(f"Velocidade base desta corrida: {config.VELOCIDADE_BASE:.2f}")
 
     ver = a.ver

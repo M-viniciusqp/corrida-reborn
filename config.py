@@ -153,8 +153,8 @@ ESTERCO_INVERTER    = False   # True se o carro esterca pro lado errado
 # 8. VELOCIDADE (0..1)
 # =====================================================================
 VELOCIDADE_BASE     = 0.85
-VELOCIDADE_MIN      = 0.40    # abaixo disso o motor nem vence o atrito
-VELOCIDADE_PERDIDO  = 0.40    # perdeu a faixa: NAO abaixo do que o motor consegue mover
+VELOCIDADE_MIN      = 0.55    # PISO: nunca manda menos que isso pros motores (pedido: pelo menos 55%)
+VELOCIDADE_PERDIDO  = 0.55    # perdeu a faixa: segue no piso, nao abaixo
 ARRANQUE_VEL        = 0.90    # empurrao ao sair do repouso (vence o atrito)
 ARRANQUE_S          = 0.45    # duracao do empurrao
 
