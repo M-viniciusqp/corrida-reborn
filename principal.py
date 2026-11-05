@@ -71,7 +71,7 @@ def main():
     thread = CameraThread(cap)
 
     if config.AUTOCALIBRAR and not a.sem_autocal:
-        print("Autocalibracao (~3 s): deixe o carro PARADO, reto, dentro da faixa, "
+        print("Autocalibracao (alguns segundos): deixe o carro PARADO, reto, dentro da faixa, "
               "com a pontilhada e a continua visiveis...")
 
         def _ler():

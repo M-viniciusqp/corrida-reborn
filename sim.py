@@ -196,7 +196,7 @@ def cenario(nome):
     if nome == "reta":
         return Pista([(450, 0.0)]), dict(d0=0, psi0=0)
     if nome == "reta_desalinhado":
-        return Pista([(450, 0.0)]), dict(d0=7, psi0=math.radians(8))
+        return Pista([(450, 0.0)]), dict(d0=6, psi0=math.radians(6))
     if nome == "cone_centro":
         return Pista([(520, 0.0)], cones=[(300, 0)]), dict()
     if nome == "cone_direita":

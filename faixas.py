@@ -101,8 +101,11 @@ class DetectorFaixas:
     def __init__(self, cam):
         self.cam = cam
         self._tracks = []           # linhas acompanhadas (EMA da cobertura)
+        # Ao ligar, o carro esta DENTRO da faixa A (e o que a autocalibracao exige):
+        # comeca com o centro em X=0. Sem isso uma unica linha vista na borda da
+        # imagem era tomada pela continua da faixa e o centro saia 50 cm errado.
         self.c_prev = 0.0           # ultimo centro conhecido (X no Y de referencia)
-        self._tem_prev = False
+        self._tem_prev = True
         self._evid = 0.0            # evidencia acumulada a favor de OUTRA faixa
         self._religou = False
         self._sem_centro = 0

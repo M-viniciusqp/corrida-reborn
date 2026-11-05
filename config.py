@@ -147,7 +147,9 @@ ESTERCO_INVERTER    = False   # True se o carro esterca pro lado errado
 # =====================================================================
 VELOCIDADE_BASE     = 0.85
 VELOCIDADE_MIN      = 0.40    # abaixo disso o motor nem vence o atrito
-VELOCIDADE_PERDIDO  = 0.22
+VELOCIDADE_PERDIDO  = 0.40    # perdeu a faixa: NAO abaixo do que o motor consegue mover
+ARRANQUE_VEL        = 0.65    # empurrao ao sair do repouso (vence o atrito)
+ARRANQUE_S          = 0.35     # duracao do empurrao
 VEL_REDUCAO_CURVA   = 0.35    # tira ate isso da velocidade com o volante todo
 VEL_REDUCAO_INCERTO = 0.40    # tira ate isso quando a proa/erro estao grandes (carro torto na pista)
 INCERTO_PROA_GRAUS  = 25.0    # proa que conta como 'torto' total

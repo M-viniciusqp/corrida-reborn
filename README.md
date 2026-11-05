@@ -105,10 +105,16 @@ O simulador usa física simples e câmera ideal: serve para achar erro de lógic
 
 ## Autocalibração ao ligar
 
-`python3 principal.py` já faz sozinho, nos primeiros ~3 s (carro **parado, reto, dentro da faixa**, vendo a
-pontilhada e a contínua): mede a largura da faixa, compara com `FAIXA_LARGURA_CM` e corrige a **escala**
-(altura da câmera). Não precisa mais rodar `--seco --ver` antes. Desligar: `--sem-autocal` ou `AUTOCALIBRAR = False`.
+`python3 principal.py` calibra sozinho antes de andar (carro **parado, reto, dentro da faixa**, vendo a
+pontilhada e a contínua; leva alguns segundos no Pi):
 
-O que ela **não** faz (feito uma vez, fica salvo em `dados/`, não precisa repetir):
-- inclinação/guinada/rolagem da câmera → `calibrar_camera.py` (`p` grava `dados/camera.json`)
+1. **Inclinação da câmera**: linhas paralelas da pista têm que ficar paralelas na vista de cima. Ele testa
+   várias inclinações sobre as mesmas imagens e fica com a que deixa o espaçamento igual de perto e de longe.
+2. **Escala**: mede a largura da faixa e compara com `FAIXA_LARGURA_CM` (corrige a altura da câmera).
+
+Se vir poucas leituras, leitura instável ou diferença absurda, **não aplica** e mantém a calibração salva.
+Não precisa mais rodar `--seco --ver` antes. Desligar: `--sem-autocal` ou `AUTOCALIBRAR = False`.
+
+O que ela **não** faz (uma vez só, fica salvo em `dados/`):
+- guinada/rolagem/deslocamento da câmera → `calibrar_camera.py` (`p` grava `dados/camera.json`)
 - centro e limites do servo → `teste_servo.py` (grava `dados/servo.json`)
