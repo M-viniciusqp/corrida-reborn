@@ -135,8 +135,8 @@ ESTERCO_INVERTER    = False   # True se o carro esterca pro lado errado
 # =====================================================================
 # 8. VELOCIDADE (0..1)
 # =====================================================================
-VELOCIDADE_BASE     = 0.38
-VELOCIDADE_MIN      = 0.26    # abaixo disso o motor nem vence o atrito
+VELOCIDADE_BASE     = 0.55
+VELOCIDADE_MIN      = 0.30    # abaixo disso o motor nem vence o atrito
 VELOCIDADE_PERDIDO  = 0.22
 VEL_REDUCAO_CURVA   = 0.45    # tira ate isso da velocidade com o volante todo
 VEL_REDUCAO_CONE    = 0.25    # tira ate isso com cone bem perto
