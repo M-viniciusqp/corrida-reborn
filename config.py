@@ -115,6 +115,11 @@ COBERTURA_CONTINUA_MIN  = 0.80
 COBERTURA_PONTILHADA_MAX = 0.72
 COBERTURA_SUAVIZACAO    = 0.6     # EMA da cobertura entre quadros (1 = so o quadro atual)
 
+# identidade das linhas (continua x pontilhada): continuidade primeiro
+EVIDENCIA_RELIGAR       = 3.0     # evidencia acumulada pra trocar de faixa (quadros ruins nao bastam)
+EVIDENCIA_ESQUECE       = 0.85    # esquecimento por quadro (menor = reage mais rapido)
+RELIGAR_SEM_CENTRO_QUADROS = 30   # tantos quadros sem faixa = esquece o historico
+
 # onde olhar adiante pra decidir a direcao (distancia a frente do eixo, cm)
 OLHAR_ADIANTE_CM    = 38.0
 

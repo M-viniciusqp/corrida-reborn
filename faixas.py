@@ -103,7 +103,9 @@ class DetectorFaixas:
         self._tracks = []           # linhas acompanhadas (EMA da cobertura)
         self.c_prev = 0.0           # ultimo centro conhecido (X no Y de referencia)
         self._tem_prev = False
-        self._salto = 0
+        self._evid = 0.0            # evidencia acumulada a favor de OUTRA faixa
+        self._religou = False
+        self._sem_centro = 0
         self.rng = np.random.default_rng(1)
 
     # ------------------------------------------------------------------
@@ -138,15 +140,8 @@ class DetectorFaixas:
 
         y_ref = self._y_ref()
         c_ref = float(centro.x(y_ref))
-        if self._tem_prev and abs(c_ref - self.c_prev) > 0.62 * config.FAIXA_LARGURA_CM:
-            # um centro nao pula meia faixa de um quadro pro outro: ignora, a
-            # nao ser que persista (ai o carro realmente foi pra la)
-            self._salto += 1
-            if self._salto < 6:
-                res.motivo = "salto de faixa (ignorado)"
-                res.linhas = linhas
-                return res
-        self._salto = 0
+        self._sem_centro = 0
+        self._religou = False
         self.c_prev = c_ref
         self._tem_prev = True
         res.centro = centro
@@ -154,6 +149,11 @@ class DetectorFaixas:
         return res
 
     def _perdeu(self, res):
+        # muito tempo sem centro: esquece o historico (o carro pode estar em outro lugar)
+        self._sem_centro += 1
+        if self._sem_centro >= config.RELIGAR_SEM_CENTRO_QUADROS:
+            self._tem_prev = False
+            self._evid = 0.0
         return res
 
     def _y_ref(self):
@@ -330,24 +330,25 @@ class DetectorFaixas:
         self._tracks = novas
 
     def _identificar(self, linhas):
-        """Atribui A / D / B a cada linha pela classe e pela posicao esperada."""
+        """Atribui A / D / B a cada linha.
+
+        Hipotese = "o centro da faixa A esta em c_h". Pontua-se pela classe
+        (continua/pontilhada medida x papel esperado) e so de leve pelo ultimo
+        centro. CONTINUIDADE primeiro: com um centro conhecido, so valem
+        hipoteses perto dele (o carro nao pula uma faixa de um quadro pro outro).
+        Se a melhor hipotese LIVRE discordar por varios quadros seguidos, ai sim
+        o carro 'religa' nela (o rotulo antigo estava errado)."""
         W = config.FAIXA_LARGURA_CM
         desloc = {"B": +1.5 * W, "D": +0.5 * W, "A": -0.5 * W}   # centro da faixa A = x + desloc
         esperada_classe = {"B": "continua", "D": "pontilhada", "A": "continua"}
         c_prev = self.c_prev if self._tem_prev else 0.0
         peso_prior = 0.35 if self._tem_prev else 0.15
 
-        # Hipoteses: "o centro da faixa A esta em c_h". Cada linha, em cada papel
-        # possivel, sugere um c_h. Vale a hipotese que MELHOR explica as linhas:
-        #   + classe batendo (continua/pontilhada medida x papel esperado)
-        #   - linhas que nao cabem em nenhum papel
-        #   - distancia ao ultimo centro conhecido (prior FRACO: uma hipotese
-        #     errada nao pode se travar pra sempre)
         candidatos = set()
         for l in linhas:
             for k in desloc:
                 candidatos.add(round(l.x_ref + desloc[k], 1))
-        melhor = None
+        hipoteses = []
         for c_h in candidatos:
             esperado = {"B": c_h - 1.5 * W, "D": c_h - 0.5 * W, "A": c_h + 0.5 * W}
             pontos = -peso_prior * abs(c_h - c_prev) / W
@@ -366,10 +367,33 @@ class DetectorFaixas:
                     pontos += 1.0 * l.peso
                 else:
                     pontos -= 1.0 * l.peso
-            if melhor is None or pontos > melhor[0]:
-                melhor = (pontos, atrib)
+            hipoteses.append((pontos, c_h, atrib))
+        if not hipoteses:
+            for l in linhas:
+                l.ident = None
+            return
+        livre = max(hipoteses, key=lambda h: h[0])
+        escolhida = livre
+        if self._tem_prev:
+            perto = [h for h in hipoteses if abs(h[1] - c_prev) <= 0.45 * W]
+            escolhida = max(perto, key=lambda h: h[0]) if perto else None
+            # EVIDENCIA acumulada (integrador com esquecimento): quanto a melhor
+            # hipotese de OUTRA faixa supera a atual. Uma leitura ruim isolada
+            # nao troca nada; evidencia consistente por varios quadros troca.
+            base_c = escolhida[1] if escolhida else c_prev
+            base_p = escolhida[0] if escolhida else -2.0
+            outras = [h for h in hipoteses if abs(h[1] - base_c) > 0.5 * W]
+            melhor_outra = max(outras, key=lambda h: h[0]) if outras else None
+            soma_peso = max(1e-6, sum(l.peso for l in linhas))
+            margem = ((melhor_outra[0] - base_p) / soma_peso) if melhor_outra else -1.0
+            margem = max(-1.5, min(1.5, margem))      # um quadro nunca decide sozinho
+            self._evid = max(-4.0, min(8.0, config.EVIDENCIA_ESQUECE * self._evid + margem))
+            if melhor_outra is not None and self._evid >= config.EVIDENCIA_RELIGAR:
+                escolhida = melhor_outra      # o rotulo antigo estava errado: religa
+                self._evid = 0.0
+                self._religou = True
         for l in linhas:
-            l.ident = melhor[1].get(id(l)) if melhor else None
+            l.ident = escolhida[2].get(id(l)) if escolhida else None
 
     # ------------------------------------------------------------------
     def _fundir(self, linhas):
