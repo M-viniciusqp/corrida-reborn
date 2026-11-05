@@ -30,6 +30,9 @@ import time
 import config
 import hardware
 
+# Valores com que o teste COMECA toda vez (ja vem marcados; 'c', 'l', 'r' mudam e 's' salva).
+MARCAS_INICIAIS = {"esquerdo": 5.0, "centro": 25.0, "direito": 175.0}
+
 if sys.platform == "win32":
     import msvcrt
 
@@ -80,13 +83,18 @@ def varrer(servo, centro, passo=5.0, alcance=35.0, pausa=0.8):
 
 def main():
     simulado = "--simulado" in sys.argv
-    servo = hardware.Servo(simulado=simulado)
-    print(f"Servo no pino BCM {servo.pino} ({servo.modo}). Calibracao atual [{servo.origem}]: "
-          f"centro {servo.cal['centro']:.0f} esq {servo.cal['esquerda']:.0f} dir {servo.cal['direita']:.0f}")
+    # Sempre comeca nestes valores (pedido do usuario), ignorando o dados/servo.json salvo.
+    # Pra mudar, edite MARCAS_INICIAIS la em cima ou use as teclas e salve com 's'.
+    cal = {"centro": MARCAS_INICIAIS["centro"], "esquerda": MARCAS_INICIAIS["esquerdo"],
+           "direita": MARCAS_INICIAIS["direito"]}
+    servo = hardware.Servo(simulado=simulado, cal=cal)
+    print(f"Servo no pino BCM {servo.pino} ({servo.modo}). Comecando em: "
+          f"esquerdo={cal['esquerda']:.0f} centro={cal['centro']:.0f} direito={cal['direita']:.0f}")
     if not hardware.hardware_real():
         print("(hardware SIMULADO: o servo de verdade nao vai se mexer)")
-    marcas = {"esquerdo": None, "centro": None, "direito": None}
-    ang = float(servo.cal["centro"])
+    marcas = dict(MARCAS_INICIAIS)
+    confirmou_extremo = False
+    ang = float(MARCAS_INICIAIS["centro"])
     servo.angulo(ang, forcar=True)
     try:
         if "--varrer" in sys.argv:
@@ -132,6 +140,14 @@ def main():
                     continue
                 if abs(d - e) < 10:
                     print("\n  Os limites estao muito proximos (<10 graus). Confira as marcas.")
+                    continue
+                curso = max(abs(c - e), abs(d - c))
+                if curso > config.SERVO_CURSO_MAX and not confirmou_extremo:
+                    print(f"\n  ATENCAO: curso de {curso:.0f} graus de um lado do centro. Direcao de carro "
+                          f"costuma ter 20 a 50. Isso parece marca ERRADA (esquerdo {e:.0f}, centro {c:.0f}, "
+                          f"direito {d:.0f}) e vai forcar o servo no batente.")
+                    print("  Confira com '1','2','3' olhando a roda. Aperte 's' de novo SO se estiver certo.")
+                    confirmou_extremo = True
                     continue
                 hardware.salvar_servo(c, e, d)
                 print(f"\nSalvo em dados/servo.json: centro {c:.0f} | esquerdo {e:.0f} | direito {d:.0f}")

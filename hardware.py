@@ -97,6 +97,11 @@ def carregar_servo():
         origem = "dados/servo.json"
     except (OSError, ValueError):
         pass
+    curso = max(abs(p["centro"] - p["esquerda"]), abs(p["direita"] - p["centro"]))
+    if curso > config.SERVO_CURSO_MAX:
+        print(f"AVISO: calibracao do servo suspeita ({origem}): curso de {curso:.0f} graus de um "
+              f"lado (esq {p['esquerda']:.0f} centro {p['centro']:.0f} dir {p['direita']:.0f}). "
+              f"Refaça com teste_servo.py: o servo pode forcar no batente.")
     return p, origem
 
 
@@ -126,10 +131,14 @@ def salvar_piso(piso):
 # servo
 # ---------------------------------------------------------------------
 class Servo:
-    def __init__(self, simulado=False, pino=None):
+    def __init__(self, simulado=False, pino=None, cal=None):
+        """cal: dict centro/esquerda/direita pra IGNORAR o arquivo salvo (servo novo)."""
         self.pino = config.SERVO_PIN if pino is None else pino
         self.G = gpio(simulado)
-        self.cal, self.origem = carregar_servo()
+        if cal is not None:
+            self.cal, self.origem = dict(cal), "partida (servo novo)"
+        else:
+            self.cal, self.origem = carregar_servo()
         self.angulo_atual = None
         self._pi = None
         self._pwm = None
