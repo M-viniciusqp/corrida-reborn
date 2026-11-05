@@ -332,30 +332,44 @@ class DetectorFaixas:
     def _identificar(self, linhas):
         """Atribui A / D / B a cada linha pela classe e pela posicao esperada."""
         W = config.FAIXA_LARGURA_CM
-        c = self.c_prev if self._tem_prev else 0.0
-        esperado = {"B": c - 1.5 * W, "D": c - 0.5 * W, "A": c + 0.5 * W}
-        # a classe (continua/pontilhada) e uma PISTA suave: uma linha cortada
-        # pela borda da imagem parece pontilhada sem ser. A posicao esperada
-        # (a partir do ultimo centro conhecido) pesa mais.
+        desloc = {"B": +1.5 * W, "D": +0.5 * W, "A": -0.5 * W}   # centro da faixa A = x + desloc
         esperada_classe = {"B": "continua", "D": "pontilhada", "A": "continua"}
-        usados = set()
-        for l in sorted(linhas, key=lambda l: -l.peso):
-            custos = []
-            for k, xe in esperado.items():
-                dist = abs(l.x_ref - xe)
-                if dist > 0.55 * W:
+        c_prev = self.c_prev if self._tem_prev else 0.0
+        peso_prior = 0.35 if self._tem_prev else 0.15
+
+        # Hipoteses: "o centro da faixa A esta em c_h". Cada linha, em cada papel
+        # possivel, sugere um c_h. Vale a hipotese que MELHOR explica as linhas:
+        #   + classe batendo (continua/pontilhada medida x papel esperado)
+        #   - linhas que nao cabem em nenhum papel
+        #   - distancia ao ultimo centro conhecido (prior FRACO: uma hipotese
+        #     errada nao pode se travar pra sempre)
+        candidatos = set()
+        for l in linhas:
+            for k in desloc:
+                candidatos.add(round(l.x_ref + desloc[k], 1))
+        melhor = None
+        for c_h in candidatos:
+            esperado = {"B": c_h - 1.5 * W, "D": c_h - 0.5 * W, "A": c_h + 0.5 * W}
+            pontos = -peso_prior * abs(c_h - c_prev) / W
+            atrib = {}
+            usados = set()
+            for l in sorted(linhas, key=lambda l: -l.peso):
+                k = min(esperado, key=lambda kk: abs(l.x_ref - esperado[kk]))
+                if abs(l.x_ref - esperado[k]) > 0.3 * W or k in usados:
+                    pontos -= 0.5 * l.peso
                     continue
-                custo = dist / W
-                if l.classe is not None and l.classe != esperada_classe[k]:
-                    custo += 0.30
-                custos.append((custo, k))
-            custos.sort()
-            l.ident = None
-            for _, k in custos:
-                if k not in usados:
-                    l.ident = k
-                    usados.add(k)
-                    break
+                usados.add(k)
+                atrib[id(l)] = k
+                if l.classe is None:
+                    pontos += 0.2 * l.peso
+                elif l.classe == esperada_classe[k]:
+                    pontos += 1.0 * l.peso
+                else:
+                    pontos -= 1.0 * l.peso
+            if melhor is None or pontos > melhor[0]:
+                melhor = (pontos, atrib)
+        for l in linhas:
+            l.ident = melhor[1].get(id(l)) if melhor else None
 
     # ------------------------------------------------------------------
     def _fundir(self, linhas):
