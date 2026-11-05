@@ -375,7 +375,11 @@ class DetectorFaixas:
         livre = max(hipoteses, key=lambda h: h[0])
         escolhida = livre
         if self._tem_prev:
-            perto = [h for h in hipoteses if abs(h[1] - c_prev) <= 0.45 * W]
+            # a porta de continuidade ABRE a cada quadro sem faixa: o carro andou/girou
+            # nesse tempo e o ultimo centro ficou velho (senao a leitura certa fica
+            # presa do lado de fora e so destrava apos dezenas de quadros)
+            porta = 0.45 * W + config.PORTA_ABRE_CM * self._sem_centro
+            perto = [h for h in hipoteses if abs(h[1] - c_prev) <= porta]
             escolhida = max(perto, key=lambda h: h[0]) if perto else None
             # EVIDENCIA acumulada (integrador com esquecimento): quanto a melhor
             # hipotese de OUTRA faixa supera a atual. Uma leitura ruim isolada

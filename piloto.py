@@ -88,7 +88,7 @@ class Piloto:
             self.proa_graus = math.degrees(proa)
 
             turn = self.direcao.atualizar(dt, erro, proa, v_cms)
-            speed = velocidade(turn, self.plan.fator_vel, fps)
+            speed = velocidade(turn, self.plan.fator_vel, fps, self.proa_graus, self.erro_cm)
         else:
             self.perdidos += 1
             self.motivo = res.motivo

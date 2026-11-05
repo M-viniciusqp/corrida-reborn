@@ -118,6 +118,7 @@ COBERTURA_SUAVIZACAO    = 0.6     # EMA da cobertura entre quadros (1 = so o qua
 # identidade das linhas (continua x pontilhada): continuidade primeiro
 EVIDENCIA_RELIGAR       = 3.0     # evidencia acumulada pra trocar de faixa (quadros ruins nao bastam)
 EVIDENCIA_ESQUECE       = 0.85    # esquecimento por quadro (menor = reage mais rapido)
+PORTA_ABRE_CM           = 8.0     # a cada quadro sem faixa, a tolerancia ao ultimo centro cresce isso (cm)
 RELIGAR_SEM_CENTRO_QUADROS = 30   # tantos quadros sem faixa = esquece o historico
 
 # onde olhar adiante pra decidir a direcao (distancia a frente do eixo, cm)
@@ -144,6 +145,9 @@ VELOCIDADE_BASE     = 0.70
 VELOCIDADE_MIN      = 0.35    # abaixo disso o motor nem vence o atrito
 VELOCIDADE_PERDIDO  = 0.22
 VEL_REDUCAO_CURVA   = 0.45    # tira ate isso da velocidade com o volante todo
+VEL_REDUCAO_INCERTO = 0.40    # tira ate isso quando a proa/erro estao grandes (carro torto na pista)
+INCERTO_PROA_GRAUS  = 25.0    # proa que conta como 'torto' total
+INCERTO_ERRO_CM     = 18.0    # erro lateral que conta como 'longe' total
 VEL_REDUCAO_CONE    = 0.25    # tira ate isso com cone bem perto
 FPS_MINIMO          = 6.0     # abaixo disso o carro reduz a velocidade
 QUADRO_VELHO_S      = 0.5     # quadro mais velho que isso = para
