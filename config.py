@@ -80,6 +80,10 @@ BEV_Y_MAX_CM   = None       # None = automatico: ate BEV_TOPO_PCT da imagem
 BEV_TOPO_PCT   = 0.20       # (automatico) ignora o topo da imagem: horizonte/parede
 BEV_PX_POR_CM  = 3.0        # resolucao da vista de cima
 
+# Ao ligar, com o carro parado na faixa, mede a largura da faixa e corrige a
+# ESCALA (altura da camera) sozinho. Nao corrige inclinacao/guinada/rolagem.
+AUTOCALIBRAR = True
+
 # =====================================================================
 # 5. A PISTA (MEDIR). Duas faixas lado a lado: continua | pontilhada | continua.
 #    O carro anda na faixa A: pontilhada a ESQUERDA, continua a DIREITA.

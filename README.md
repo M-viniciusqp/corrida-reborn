@@ -102,3 +102,13 @@ python sim.py cone_centro --ver
 
 O simulador usa física simples e câmera ideal: serve para achar erro de lógica e de sinal
 (esquerda/direita), **não** para afinar números. A validação real é na pista.
+
+## Autocalibração ao ligar
+
+`python3 principal.py` já faz sozinho, nos primeiros ~3 s (carro **parado, reto, dentro da faixa**, vendo a
+pontilhada e a contínua): mede a largura da faixa, compara com `FAIXA_LARGURA_CM` e corrige a **escala**
+(altura da câmera). Não precisa mais rodar `--seco --ver` antes. Desligar: `--sem-autocal` ou `AUTOCALIBRAR = False`.
+
+O que ela **não** faz (feito uma vez, fica salvo em `dados/`, não precisa repetir):
+- inclinação/guinada/rolagem da câmera → `calibrar_camera.py` (`p` grava `dados/camera.json`)
+- centro e limites do servo → `teste_servo.py` (grava `dados/servo.json`)

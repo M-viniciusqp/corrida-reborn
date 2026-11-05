@@ -11,6 +11,7 @@ Opcoes:
     --tempo S     para sozinho depois de S segundos
     --camera N    numero da camera (ou caminho de um video, pra testar no PC)
     --vel V       velocidade base so desta corrida (ex.: --vel 0.4), sem mexer no config.py
+    --sem-autocal nao autocalibra a escala ao ligar (padrao: autocalibra com o carro parado)
     --sem-log     nao grava a pasta logs/
     --simulado    GPIO de mentira (testa o programa sem o carro)
 
@@ -28,6 +29,7 @@ import cv2
 import config
 import hardware
 from camera import abrir_camera, ajustar, CameraThread
+from autocal import autocalibrar
 from geometria import carregar_parametros
 from piloto import Piloto
 from registro import Registro
@@ -42,6 +44,8 @@ def main():
     ap.add_argument("--camera", default=None)
     ap.add_argument("--sem-log", action="store_true")
     ap.add_argument("--simulado", action="store_true")
+    ap.add_argument("--sem-autocal", action="store_true",
+                    help="nao autocalibra a escala ao ligar")
     ap.add_argument("--vel", type=float, default=None,
                     help="velocidade base desta corrida (0..1), sem mexer no config.py")
     a = ap.parse_args()
@@ -65,6 +69,19 @@ def main():
         print("Erro: a camera nao abriu (v4l2-ctl --list-devices).")
         return
     thread = CameraThread(cap)
+
+    if config.AUTOCALIBRAR and not a.sem_autocal:
+        print("Autocalibracao (~3 s): deixe o carro PARADO, reto, dentro da faixa, "
+              "com a pontilhada e a continua visiveis...")
+
+        def _ler():
+            f, _, idade = thread.read()
+            return None if f is None or idade > config.QUADRO_VELHO_S else ajustar(f)
+        params, info = autocalibrar(params, _ler)
+        print("  autocalibracao: " + info["motivo"])
+        if info["aplicada"]:
+            piloto = Piloto(params, config.CAMERA_RES)
+            print(f"  {piloto.cam.resumo()}")
 
     servo = motores = None
     if not a.seco:
