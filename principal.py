@@ -10,6 +10,7 @@ Opcoes:
     --ver         abre as janelas no PROPRIO Raspberry (terminal da area de trabalho)
     --tempo S     para sozinho depois de S segundos
     --camera N    numero da camera (ou caminho de um video, pra testar no PC)
+    --vel V       velocidade base so desta corrida (ex.: --vel 0.4), sem mexer no config.py
     --sem-log     nao grava a pasta logs/
     --simulado    GPIO de mentira (testa o programa sem o carro)
 
@@ -41,7 +42,13 @@ def main():
     ap.add_argument("--camera", default=None)
     ap.add_argument("--sem-log", action="store_true")
     ap.add_argument("--simulado", action="store_true")
+    ap.add_argument("--vel", type=float, default=None,
+                    help="velocidade base desta corrida (0..1), sem mexer no config.py")
     a = ap.parse_args()
+    if a.vel is not None:
+        config.VELOCIDADE_BASE = max(0.0, min(1.0, a.vel))
+        config.VELOCIDADE_MIN = min(config.VELOCIDADE_MIN, config.VELOCIDADE_BASE)
+        print(f"Velocidade base desta corrida: {config.VELOCIDADE_BASE:.2f}")
 
     ver = a.ver
     if ver and os.name != "nt" and not os.environ.get("DISPLAY"):
