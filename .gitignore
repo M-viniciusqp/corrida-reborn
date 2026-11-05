@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+logs/
+# calibracoes geradas NO carro (servo.json / camera.json): nao versionar, senao o
+# git pull no Pi sobrescreveria/conflitaria com o que voce calibrou la
+dados/

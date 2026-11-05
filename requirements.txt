@@ -1,0 +1,4 @@
+# No Raspberry Pi prefira o pacote do sistema:  sudo apt install python3-opencv python3-numpy
+opencv-python
+numpy
+# opcional (servo sem tremor): pigpio
