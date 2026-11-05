@@ -80,6 +80,7 @@ class Carro:
         self.psi = psi0
         self.delta = 0.0
         self.v = 0.0
+        self.limiar = 0.0               # potencia minima pra se mover (atrito)
 
     def frente(self):
         return self.p + self.Lb * np.array([math.sin(self.psi), math.cos(self.psi)])
@@ -88,7 +89,7 @@ class Carro:
         delta_cmd = math.radians(config.ESTERCO_MAX_GRAUS) * turn
         if config.ESTERCO_INVERTER:
             delta_cmd = -delta_cmd
-        alvo_v = speed * config.V_CMS_NA_VEL_1 * fator_v
+        alvo_v = (speed * config.V_CMS_NA_VEL_1 * fator_v) if speed >= self.limiar else 0.0
         n = max(1, int(dt / 0.01))
         h = dt / n
         for _ in range(n):
@@ -227,7 +228,7 @@ NOMES = ["reta", "reta_desalinhado", "cone_centro", "cone_direita", "cone_esquer
          "cone_outra_faixa", "dois_cones", "curva_dir", "curva_esq", "curva_cone"]
 
 
-def rodar(nome, ver=False, erro_cam=False, salvar=None, fps=12.0, fator_v=1.0, quiet=False):
+def rodar(nome, ver=False, erro_cam=False, salvar=None, fps=12.0, fator_v=1.0, quiet=False, limiar=0.0):
     pista, kw = cenario(nome)
     params = parametros_padrao()
     res = config.CAMERA_RES
@@ -241,6 +242,7 @@ def rodar(nome, ver=False, erro_cam=False, salvar=None, fps=12.0, fator_v=1.0, q
     cam_real = CameraChao(real, res)
     rend = Renderizador(cam_real, res)
     carro = Carro(pista, **kw)
+    carro.limiar = limiar
     cones_mundo = [c["w"] for c in pista.cones]
 
     dt = 1.0 / fps

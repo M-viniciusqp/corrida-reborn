@@ -21,6 +21,7 @@ import config
 
 PASTA_DADOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dados")
 ARQ_SERVO = os.path.join(PASTA_DADOS, "servo.json")
+ARQ_MOTOR = os.path.join(PASTA_DADOS, "motor.json")
 
 
 # ---------------------------------------------------------------------
@@ -104,6 +105,21 @@ def salvar_servo(centro, esquerda, direita):
     with open(ARQ_SERVO, "w", encoding="utf-8") as f:
         json.dump({"centro": float(centro), "esquerda": float(esquerda),
                    "direita": float(direita)}, f, indent=2)
+
+
+def carregar_piso():
+    """Piso de potencia aprendido (motor_auto.py) ou None."""
+    try:
+        with open(ARQ_MOTOR, "r", encoding="utf-8") as f:
+            return float(json.load(f)["piso"])
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def salvar_piso(piso):
+    os.makedirs(PASTA_DADOS, exist_ok=True)
+    with open(ARQ_MOTOR, "w", encoding="utf-8") as f:
+        json.dump({"piso": round(float(piso), 3)}, f, indent=2)
 
 
 # ---------------------------------------------------------------------

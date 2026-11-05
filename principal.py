@@ -61,7 +61,10 @@ def main():
         ver = False
 
     params, origem = carregar_parametros()
-    piloto = Piloto(params, config.CAMERA_RES)
+    piso_salvo = hardware.carregar_piso()
+    piloto = Piloto(params, config.CAMERA_RES, piso=piso_salvo)
+    print(f"Potencia minima pra andar: {piloto.gov.piso:.2f} "
+          f"({'aprendida em dados/motor.json' if piso_salvo is not None else 'padrao do config; o carro aprende sozinho'})")
     print(f"Geometria da camera ({origem}):\n  {piloto.cam.resumo()}")
 
     cap = abrir_camera(a.camera)
@@ -80,8 +83,9 @@ def main():
         params, info = autocalibrar(params, _ler)
         print("  autocalibracao: " + info["motivo"])
         if info["aplicada"]:
-            piloto = Piloto(params, config.CAMERA_RES)
+            piloto = Piloto(params, config.CAMERA_RES, piso=piso_salvo)
             print(f"  {piloto.cam.resumo()}")
+        piloto.gov.ruido = max(0.3, info.get("ruido", 0.6))
 
     servo = motores = None
     if not a.seco:
@@ -155,6 +159,9 @@ def main():
         if servo:
             servo.fechar()
         hardware.limpar()
+        if piloto.gov.piso > piloto.gov.piso_inicial + 0.005:
+            hardware.salvar_piso(piloto.gov.piso)
+            print(f"Potencia minima aprendida: {piloto.gov.piso:.2f} (salva em dados/motor.json)")
         thread.release()
         if registro:
             registro.fechar()

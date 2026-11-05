@@ -27,6 +27,7 @@ import numpy as np
 import config
 from faixas import DetectorFaixas, espacamento_perp
 from geometria import CameraChao
+from motor_auto import pequeno_cinza
 from piloto import Piloto
 
 
@@ -142,7 +143,10 @@ def autocalibrar(params, ler_frame, duracao=2.0, log=print):
             continue
         frames.append(f.copy())
         time.sleep(0.12)                      # quadros distintos
-    info = {"aplicada": False, "motivo": "", "largura_medida": None}
+    # ruido do quadro PARADO (o governador do motor usa pra saber o que e 'cena parada')
+    peq = [pequeno_cinza(f) for f in frames]
+    ruido = float(np.mean([np.abs(peq[i + 1] - peq[i]).mean() for i in range(len(peq) - 1)]))         if len(peq) > 1 else 0.6
+    info = {"aplicada": False, "motivo": "", "largura_medida": None, "ruido": ruido}
     if len(frames) < 4:
         info["motivo"] = "poucos quadros da camera; mantive a calibracao salva"
         return params, info
@@ -150,11 +154,16 @@ def autocalibrar(params, ler_frame, duracao=2.0, log=print):
     novo = dict(params)
     partes = []
 
-    # 1) inclinacao pelo paralelismo
-    try:
-        inc, txt = _acertar_inclinacao(novo, frames)
-    except ValueError as e:
-        inc, txt = None, f"geometria invalida ({e})"
+    # 1) inclinacao pelo paralelismo (DESLIGADA por padrao: no carro real ela se enganou)
+    if config.AUTOCAL_INCLINACAO:
+        try:
+            inc, txt = _acertar_inclinacao(novo, frames)
+        except ValueError as e:
+            inc, txt = None, f"geometria invalida ({e})"
+        if inc is not None and abs(inc - novo["inclinacao"]) > config.AUTOCAL_INCLINACAO_MAX:
+            inc, txt = None, f"inclinacao sugerida {inc:.0f} graus muito longe da atual; mantive"
+    else:
+        inc, txt = None, f"inclinacao mantida em {novo['inclinacao']:.0f} graus"
     partes.append(txt)
     if inc is not None:
         novo["inclinacao"] = inc
@@ -176,9 +185,9 @@ def autocalibrar(params, ler_frame, duracao=2.0, log=print):
             partes.append(f"largura: leitura instavel ({med - disp / 2:.0f} a {med + disp / 2:.0f} cm); escala mantida")
         elif abs(fator - 1.0) < 0.03:
             partes.append(f"largura {med:.1f} cm bate com {esperado:.0f} cm (escala ok)")
-        elif not (0.6 <= fator <= 1.6):
-            partes.append(f"largura medida {med:.1f} cm MUITO longe de {esperado:.0f} cm: "
-                          f"confira FAIXA_LARGURA_CM e a calibracao; escala mantida")
+        elif abs(fator - 1.0) > config.AUTOCAL_ESCALA_MAX:
+            partes.append(f"largura medida {med:.1f} cm esta longe de {esperado:.0f} cm (>{100 * config.AUTOCAL_ESCALA_MAX:.0f}%): "
+                          f"confira FAIXA_LARGURA_CM, se o carro esta reto na faixa e rode calibrar_camera.py; escala mantida")
         else:
             novo["altura_cm"] = novo["altura_cm"] * fator
             info["aplicada"] = True

@@ -103,18 +103,28 @@ python sim.py cone_centro --ver
 O simulador usa física simples e câmera ideal: serve para achar erro de lógica e de sinal
 (esquerda/direita), **não** para afinar números. A validação real é na pista.
 
-## Autocalibração ao ligar
+## Calibração automática (nada a fazer na pista)
 
-`python3 principal.py` calibra sozinho antes de andar (carro **parado, reto, dentro da faixa**, vendo a
-pontilhada e a contínua; leva alguns segundos no Pi):
+`python3 principal.py` cuida sozinho de três coisas:
 
-1. **Inclinação da câmera**: linhas paralelas da pista têm que ficar paralelas na vista de cima. Ele testa
-   várias inclinações sobre as mesmas imagens e fica com a que deixa o espaçamento igual de perto e de longe.
-2. **Escala**: mede a largura da faixa e compara com `FAIXA_LARGURA_CM` (corrige a altura da câmera).
+1. **Escala** (ao ligar, carro **parado, reto, na faixa**): mede a largura da faixa (distância
+   *perpendicular* entre as linhas) e corrige a altura da câmera para bater com `FAIXA_LARGURA_CM`.
+   Só muda até ±15%; fora disso mantém o salvo e avisa. (A busca automática de inclinação existe
+   mas fica **desligada**: no carro real ela se enganou. `AUTOCAL_INCLINACAO`.)
+2. **Potência mínima para andar** (`motor_auto.py`): abaixo de certa potência o motor não vence o
+   atrito e o carro **para** com o volante todo virado. O programa olha a própria câmera: se mandou
+   andar com o volante virado e o erro/proa não mudam, o carro está parado e ele sobe a potência
+   mínima de 5 em 5% até andar. O valor aprendido fica em `dados/motor.json` e vale nas próximas
+   corridas. Também dá um empurrão na largada.
+3. **Ruído da câmera parada**, que o item 2 usa para saber o que é "cena parada".
 
-Se vir poucas leituras, leitura instável ou diferença absurda, **não aplica** e mantém a calibração salva.
-Não precisa mais rodar `--seco --ver` antes. Desligar: `--sem-autocal` ou `AUTOCALIBRAR = False`.
-
-O que ela **não** faz (uma vez só, fica salvo em `dados/`):
-- guinada/rolagem/deslocamento da câmera → `calibrar_camera.py` (`p` grava `dados/camera.json`)
+Uma vez só (fica salvo em `dados/`, não precisa repetir):
+- inclinação/guinada/rolagem da câmera → `calibrar_camera.py` (`p` grava `dados/camera.json`)
 - centro e limites do servo → `teste_servo.py` (grava `dados/servo.json`)
+- carro puxando para um lado → `teste_reta.py`
+
+## Velocidade
+
+Reta: `VELOCIDADE_BASE` (0.85). O carro freia **antes** das curvas (olha a curvatura da faixa lá na
+frente) e reduz quando está torto ou longe do centro, mas nunca abaixo do piso aprendido.
+`python3 principal.py --vel 0.6` testa mais devagar sem editar o config.

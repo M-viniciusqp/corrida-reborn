@@ -83,6 +83,10 @@ BEV_PX_POR_CM  = 3.0        # resolucao da vista de cima
 # Ao ligar, com o carro parado na faixa, mede a largura da faixa e corrige a
 # ESCALA (altura da camera) sozinho. Nao corrige inclinacao/guinada/rolagem.
 AUTOCALIBRAR = True
+AUTOCAL_INCLINACAO = False    # a busca de inclinacao pelo paralelismo se enganou no carro real
+                              # (foi a 45 graus e desmontou a geometria): so a ESCALA e ajustada
+AUTOCAL_INCLINACAO_MAX = 6.0  # se ligar: nunca muda mais que isso
+AUTOCAL_ESCALA_MAX = 0.15     # a escala so muda ate +-15%; mais que isso = algo errado, mantem
 
 # =====================================================================
 # 5. A PISTA (MEDIR). Duas faixas lado a lado: continua | pontilhada | continua.
@@ -150,8 +154,23 @@ ESTERCO_INVERTER    = False   # True se o carro esterca pro lado errado
 VELOCIDADE_BASE     = 0.85
 VELOCIDADE_MIN      = 0.40    # abaixo disso o motor nem vence o atrito
 VELOCIDADE_PERDIDO  = 0.40    # perdeu a faixa: NAO abaixo do que o motor consegue mover
-ARRANQUE_VEL        = 0.65    # empurrao ao sair do repouso (vence o atrito)
-ARRANQUE_S          = 0.35     # duracao do empurrao
+ARRANQUE_VEL        = 0.90    # empurrao ao sair do repouso (vence o atrito)
+ARRANQUE_S          = 0.45    # duracao do empurrao
+
+# Governador do motor (motor_auto.py): se mandou andar e a cena da camera nao muda,
+# o carro esta parado -> sobe o piso de potencia ate ele andar (e salva em dados/motor.json).
+STALL_MOV_MIN       = 1.5     # diferenca media (0-255) do quadro vs 0.3 s atras que conta como 'andando'
+STALL_JANELA_S      = 0.30
+STALL_GRACA_S       = 0.90    # depois de mandar andar, espera isso antes de julgar
+STALL_ACUM_S        = 0.60    # parado por isso -> sobe o piso
+STALL_TURN_MIN      = 0.25    # volante virado a partir disso e a prova FORTE (pose deveria mudar)
+STALL_D_ERRO_CM     = 1.0     # erro lateral variou menos que isso na janela = pose parada
+STALL_D_PROA_GRAUS  = 1.5
+STALL_ACUM_FRACO_S  = 2.0     # prova FRACA (so imagem parada, volante reto) precisa de mais tempo
+STALL_FRACO_VEL_MAX = 0.70    # ... e so vale com potencia baixa (a 0.85 o carro anda de certeza)
+PISO_PASSO          = 0.05
+PISO_MAX            = 0.95    # teto com prova forte
+PISO_MAX_FRACO      = 0.55    # teto com prova fraca (reta lisa parece parada)
 VEL_REDUCAO_CURVA   = 0.35    # tira ate isso da velocidade com o volante todo
 VEL_REDUCAO_INCERTO = 0.40    # tira ate isso quando a proa/erro estao grandes (carro torto na pista)
 INCERTO_PROA_GRAUS  = 25.0    # proa que conta como 'torto' total

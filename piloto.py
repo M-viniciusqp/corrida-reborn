@@ -23,10 +23,11 @@ from faixas import DetectorFaixas
 from cones import DetectorCones, RastreadorCones
 from planejador import Planejador
 from controle import Direcao, velocidade
+from motor_auto import GovernadorMotor, pequeno_cinza
 
 
 class Piloto:
-    def __init__(self, params=None, res=None):
+    def __init__(self, params=None, res=None, piso=None):
         self.cam = CameraChao(params, res)
         self.faixas = DetectorFaixas(self.cam)
         self.detector = DetectorCones(self.cam)
@@ -46,8 +47,7 @@ class Piloto:
         self.eventos = []
         self._t_ant = None
         self._perdido_avisado = False
-        self._t_kick = None         # inicio do empurrao de largada
-        self._v_ant = 0.0           # velocidade (sem o empurrao) do quadro anterior
+        self.gov = GovernadorMotor(piso)   # piso de potencia aprendido + empurrao de largada
 
     # ------------------------------------------------------------------
     def step(self, t, frame, fps=30.0, debug=False):
@@ -117,14 +117,10 @@ class Piloto:
                 turn = self.direcao.decair(0.97)
                 speed = config.VELOCIDADE_PERDIDO
 
-        # empurrao de largada: o motor parado nao vence o atrito na velocidade de
-        # cruzeiro. So na saida do repouso, por ARRANQUE_S.
-        if speed > 0.05 and self._v_ant <= 0.05:
-            self._t_kick = t
-        self._v_ant = speed
-        if (self._t_kick is not None and speed > 0.05 and
-                t - self._t_kick < config.ARRANQUE_S):
-            speed = max(speed, config.ARRANQUE_VEL)
+        # governador do motor: piso aprendido (carro parado -> sobe a potencia) e empurrao
+        speed = self.gov.atualizar(t, dt, pequeno_cinza(frame), speed, turn,
+                                   self.erro_cm, self.proa_graus)
+        self.eventos.extend(self.gov.eventos)
 
         self.turn, self.speed = turn, speed
         return turn, speed
