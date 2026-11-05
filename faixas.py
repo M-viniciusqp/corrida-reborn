@@ -63,6 +63,16 @@ class Linha:
         return float(np.clip(self.coef[0], -0.8, 0.8))
 
 
+def espacamento_perp(la, lb, y):
+    """Distancia PERPENDICULAR (cm) entre duas linhas ~paralelas, medida em Y.
+    A diferenca de X em Y fixo e maior que a distancia real quando as linhas estao
+    inclinadas (carro torto ou curva): dx = d / cos(theta)."""
+    dx = float(lb.x(y) - la.x(y))
+    maior = la if (la.y1 - la.y0) >= (lb.y1 - lb.y0) else lb
+    s = maior.inclinacao(y)
+    return dx / math.sqrt(1.0 + s * s)
+
+
 class Centro:
     """Centro da faixa A: X = poly(Y)."""
     __slots__ = ("coef", "y0", "y1", "n_linhas", "grau")
@@ -107,6 +117,7 @@ class DetectorFaixas:
         self.c_prev = 0.0           # ultimo centro conhecido (X no Y de referencia)
         self._tem_prev = True
         self._evid = 0.0            # evidencia acumulada a favor de OUTRA faixa
+        self._slope = 0.0           # inclinacao do centro no quadro anterior (herdada por linhas curtas)
         self._religou = False
         self._sem_centro = 0
         self.rng = np.random.default_rng(1)
@@ -131,6 +142,16 @@ class DetectorFaixas:
             res.motivo = "sem linhas"
             return self._perdeu(res)
 
+        # Linha CURTA (um traco da pontilhada): a inclinacao de poucos cm e ruido, e ao
+        # esticar ate Y_ref o erro vira varios cm. Todas as linhas da pista sao paralelas,
+        # entao herda a inclinacao do centro do quadro anterior e mantem so a posicao.
+        span = cam.y_max - cam.y_min
+        for l in linhas:
+            if (l.y1 - l.y0) < config.LINHA_CURTA_FRAC * span:
+                ym = 0.5 * (l.y0 + l.y1)
+                xm = float(l.x(ym))
+                l.coef = np.array([self._slope, xm - self._slope * ym])
+
         self._medir_cobertura(linhas, mascara)
         self._classificar(linhas)
         self._identificar(linhas)
@@ -145,6 +166,7 @@ class DetectorFaixas:
         c_ref = float(centro.x(y_ref))
         self._sem_centro = 0
         self._religou = False
+        self._slope = float(np.clip(0.5 * self._slope + 0.5 * centro.inclinacao(y_ref), -0.6, 0.6))
         self.c_prev = c_ref
         self._tem_prev = True
         res.centro = centro
@@ -418,16 +440,33 @@ class DetectorFaixas:
         base = est[0][1]
         est = [(l, c) for (l, c) in est if abs(c - base) <= 0.35 * W]
 
+        span = cam.y_max - cam.y_min
+        longas = [(l, c) for (l, c) in est if (l.y1 - l.y0) >= config.LINHA_CURTA_FRAC * span]
+        curtas = [(l, c) for (l, c) in est if (l.y1 - l.y0) < config.LINHA_CURTA_FRAC * span]
+        base = longas if longas else est       # a FORMA vem das linhas longas
         Ys = np.linspace(cam.y_min, cam.y_max, 14)
         num = np.zeros_like(Ys)
         den = 0.0
-        for l, _ in est:
+        for l, _ in base:
             num += l.peso * (l.x(Ys) + desloc[l.ident])
             den += l.peso
         Xc = num / den
-        y_lo = min(l.y0 for l, _ in est)
-        y_hi = max(l.y1 for l, _ in est)
+        if longas and curtas:
+            # linhas curtas so corrigem a POSICAO (no Y onde foram vistas), nao a forma
+            deltas, pesos = [], []
+            for l, _ in curtas:
+                ym = 0.5 * (l.y0 + l.y1)
+                d = float(l.x(ym)) + desloc[l.ident] - float(np.interp(ym, Ys, Xc))
+                if abs(d) <= 0.25 * W:
+                    deltas.append(d)
+                    pesos.append(l.peso)
+            if deltas:
+                wc = sum(pesos)
+                wl = sum(l.peso for l, _ in longas)
+                Xc = Xc + float(np.average(deltas, weights=pesos)) * (wc / (wc + wl))
+        y_lo = min(l.y0 for l, _ in base)
+        y_hi = max(l.y1 for l, _ in base)
         extensao = y_hi - y_lo
-        grau = 2 if (extensao >= config.CURVA_GRAU2_EXTENSAO * (cam.y_max - cam.y_min)) else 1
+        grau = 2 if (extensao >= config.CURVA_GRAU2_EXTENSAO * span) else 1
         coef = np.polyfit(Ys, Xc, grau)
         return Centro(coef, cam.y_min, cam.y_max, len(est))

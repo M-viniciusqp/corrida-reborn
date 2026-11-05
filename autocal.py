@@ -25,7 +25,7 @@ import time
 import numpy as np
 
 import config
-from faixas import DetectorFaixas
+from faixas import DetectorFaixas, espacamento_perp
 from geometria import CameraChao
 from piloto import Piloto
 
@@ -121,11 +121,11 @@ def _largura(params, frames):
             if passada == 0:
                 continue
             y = p.faixas._y_ref()
-            por = {l.ident: float(l.x(y)) for l in res.linhas if l.ident}
+            por = {l.ident: l for l in res.linhas if l.ident}
             if "D" in por and "A" in por:
-                amostras.append(por["A"] - por["D"])
+                amostras.append(espacamento_perp(por["D"], por["A"], y))
             if "B" in por and "D" in por:
-                amostras.append(por["D"] - por["B"])
+                amostras.append(espacamento_perp(por["B"], por["D"], y))
     return amostras
 
 

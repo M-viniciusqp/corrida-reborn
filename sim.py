@@ -211,11 +211,18 @@ def cenario(nome):
         return Pista([(150, 0.0), (180, 1 / 130.0), (200, 0.0)]), dict()
     if nome == "curva_esq":
         return Pista([(150, 0.0), (180, -1 / 130.0), (200, 0.0)]), dict()
+    if nome == "reta_traco_raro":      # pontilhada com traco curto e espaco longo (a pista real)
+        return Pista([(450, 0.0)], traco=(7.0, 45.0)), dict(d0=3, psi0=math.radians(2))
+    if nome == "curva_dir_traco_raro":
+        return Pista([(150, 0.0), (180, 1 / 130.0), (200, 0.0)], traco=(7.0, 45.0)), dict()
+    if nome == "curva_esq_traco_raro":
+        return Pista([(150, 0.0), (180, -1 / 130.0), (200, 0.0)], traco=(7.0, 45.0)), dict()
     if nome == "curva_cone":
         return Pista([(120, 0.0), (220, 1 / 150.0), (200, 0.0)], cones=[(260, 2)]), dict()
     raise SystemExit(f"cenario desconhecido: {nome}")
 
 
+NOMES_TRACO_RARO = ["reta_traco_raro", "curva_dir_traco_raro", "curva_esq_traco_raro"]
 NOMES = ["reta", "reta_desalinhado", "cone_centro", "cone_direita", "cone_esquerda",
          "cone_outra_faixa", "dois_cones", "curva_dir", "curva_esq", "curva_cone"]
 

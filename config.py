@@ -114,6 +114,8 @@ LINHA_MIN_EXTENSAO_CM = 6.0   # comprimento minimo (cm) de tinta alinhada (um tr
 LINHA_RESIDUO_MAX_CM = 3.0    # erro medio do ajuste acima disso = rejeita
 CURVA_GRAU2_EXTENSAO = 0.6    # so ajusta parabola se a linha cobrir isso da BEV
 
+LINHA_CURTA_FRAC     = 0.40   # linha com menos que isso da faixa visivel = 'curta' (so posicao, herda inclinacao)
+
 # continua x pontilhada: fracao dos trechos (janelas) que tem tinta
 COBERTURA_CONTINUA_MIN  = 0.80
 COBERTURA_PONTILHADA_MAX = 0.72

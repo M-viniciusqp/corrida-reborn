@@ -36,6 +36,7 @@ import numpy as np
 import config
 import geometria
 import visual
+from faixas import espacamento_perp
 from camera import abrir_camera, ajustar, CameraThread
 from piloto import Piloto
 
@@ -156,12 +157,13 @@ def _largura_pista(piloto):
     if res is None or not res.linhas:
         return "nenhuma linha detectada (a pista esta visivel? a mascara verde pega as linhas?)"
     y = piloto.faixas._y_ref()
-    por_id = {l.ident: float(l.x(y)) for l in res.linhas if l.ident}
+    linhas_id = {l.ident: l for l in res.linhas if l.ident}
+    por_id = {k: float(l.x(y)) for k, l in linhas_id.items()}
     partes = []
     if "D" in por_id and "A" in por_id:
-        partes.append(f"pontilhada->continua {por_id['A'] - por_id['D']:.1f}cm")
+        partes.append(f"pontilhada->continua {espacamento_perp(linhas_id['D'], linhas_id['A'], y):.1f}cm")
     if "B" in por_id and "D" in por_id:
-        partes.append(f"continua->pontilhada {por_id['D'] - por_id['B']:.1f}cm")
+        partes.append(f"continua->pontilhada {espacamento_perp(linhas_id['B'], linhas_id['D'], y):.1f}cm")
     nomes = " ".join(f"{k}:{v:+.0f}" for k, v in sorted(por_id.items()))
     esperado = f"(esperado {config.FAIXA_LARGURA_CM:.0f}cm)"
     if not partes:
