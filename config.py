@@ -51,7 +51,9 @@ SERVO_DEADBAND_DEG    = 0.7             # so reescreve o pulso se mudou mais que
 # 3. CAMERA
 # =====================================================================
 CAMERA_ID   = 0
-CAMERA_RES  = (320, 240)        # largura, altura. Nao precisa ser rapido.
+CAMERA_CAPTURA_RES = (640, 360) # o que a camera ENTREGA (a sua mostrou 640x360 = 16:9)
+CAMERA_RES  = (320, 180)        # o que o piloto PROCESSA (mesma proporcao da captura!)
+                                # Proporcao diferente achata a imagem e erra toda a geometria.
 CAMERA_FPS  = 30
 CAMERA_ESPELHAR = False         # True se a imagem sair de cabeca pra baixo/espelhada
 CAMERA_GIRAR_180 = False
@@ -148,6 +150,9 @@ PERDIDO_QUADROS_PARAR   = 45  # depois disso para
 # =====================================================================
 # 9. CONES
 # =====================================================================
+CONES_ATIVOS = False          # False = SO CORRIDA: nao detecta nem desvia de cone.
+                              # (O codigo fica guardado; True liga de novo.)
+
 # cor (HSV do OpenCV, H 0..179). Vermelho/laranja "dobra": H perto de 0 e de 179.
 CONE_H_BAIXO     = 14
 CONE_H_ALTO      = 165

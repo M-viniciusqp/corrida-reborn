@@ -39,7 +39,7 @@ class _CapFoto:
 
 def abrir_camera(fonte=None, res=None, fps=None):
     """fonte: numero da camera (0, 1...) ou caminho de um video/foto. None = config."""
-    res = res or config.CAMERA_RES
+    res = res or config.CAMERA_CAPTURA_RES
     fps = fps or config.CAMERA_FPS
     fonte = config.CAMERA_ID if fonte is None else fonte
     if isinstance(fonte, str) and fonte.lower().endswith((".png", ".jpg", ".jpeg", ".bmp")):
@@ -64,6 +64,11 @@ def abrir_camera(fonte=None, res=None, fps=None):
     fourcc = int(cap.get(cv2.CAP_PROP_FOURCC))
     fcc = "".join(chr((fourcc >> 8 * i) & 0xFF) for i in range(4))
     print(f"Camera {indice}: {w}x{h} formato={fcc.strip()}")
+    pw, ph = config.CAMERA_RES
+    if h and abs(w / h - pw / ph) > 0.05:
+        print(f"AVISO: a camera entrega {w}x{h} (proporcao {w / h:.2f}) mas o piloto usa "
+              f"{pw}x{ph} ({pw / ph:.2f}). A imagem sera ACHATADA e a geometria erra. "
+              f"Ajuste CAMERA_RES (e CAMERA_CAPTURA_RES) no config.py para a mesma proporcao.")
     return cap
 
 

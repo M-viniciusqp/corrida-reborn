@@ -55,7 +55,10 @@ class Piloto:
 
         res = self.faixas.processar(frame, debug=debug)
         self.res = res
-        self.cones = self.rastreador.atualizar(self.detector.detectar(frame, debug=debug))
+        if config.CONES_ATIVOS:
+            self.cones = self.rastreador.atualizar(self.detector.detectar(frame, debug=debug))
+        else:
+            self.cones = []      # corrida pura: cone nem e processado
         # velocidade estimada (sem encoder): do comando anterior, nunca abaixo do
         # minimo (parado/arrancando o ganho do Stanley explodiria)
         v_cms = max(self.speed, config.VELOCIDADE_MIN) * config.V_CMS_NA_VEL_1

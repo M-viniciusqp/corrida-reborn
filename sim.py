@@ -25,6 +25,11 @@ import config
 from geometria import CameraChao, parametros_padrao
 from piloto import Piloto
 
+# O carro roda SEM cones (config.CONES_ATIVOS = False). O simulador liga a funcao
+# de cones so pra testa-la; com --corrida ele usa o config como esta (sem cones).
+if "--corrida" not in sys.argv:
+    config.CONES_ATIVOS = True
+
 W = config.FAIXA_LARGURA_CM
 PISO = (58, 60, 62)
 LINHA = (232, 232, 232)

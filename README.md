@@ -1,8 +1,11 @@
 # reborn-autonomos
 
-Carro autônomo (Raspberry Pi) que **segue a faixa e desvia de cones** com **uma câmera**.
+Carro autônomo (Raspberry Pi) que **segue a faixa** com **uma câmera**.
 Faz a mesma tarefa do `gatuno-rapido`, mas com outra lógica, pensada para o carro novo
-(câmera em outro ângulo). Não precisa ser rápido: roda em 320x240.
+(câmera em outro ângulo). Não precisa ser rápido: processa em 320x180.
+
+> **Modo atual: só corrida.** Cones estão DESLIGADOS (`CONES_ATIVOS = False` no `config.py`):
+> não são detectados nem desviados. O código de cones fica guardado; `True` liga de novo.
 
 | | gatuno-rapido | reborn-autonomos |
 |---|---|---|
