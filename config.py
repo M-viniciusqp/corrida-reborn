@@ -147,7 +147,7 @@ PROA_PESO           = 1.0     # peso do termo de proa
 ERRO_ZONA_MORTA_CM  = 0.6
 ESTERCO_SUAVIZACAO  = 0.55    # EMA do comando de volante (1 = sem filtro)
 ESTERCO_SLEW        = 6.0     # maximo de variacao do turn (-1..1) por segundo
-ESTERCO_INVERTER    = False   # True se o carro esterca pro lado errado
+ESTERCO_INVERTER    = True    # o volante deste carro esterca pro lado oposto ao esperado (visto no teste)
 
 # =====================================================================
 # 8. VELOCIDADE (0..1)
@@ -184,7 +184,7 @@ QUADRO_VELHO_S      = 0.5     # quadro mais velho que isso = para
 
 # perdeu as faixas
 PERDIDO_QUADROS_DEVAGAR = 10  # anda devagar segurando o volante
-PERDIDO_QUADROS_PARAR   = 45  # depois disso para
+PERDIDO_QUADROS_PARAR   = 20    # ~0.8 s sem faixa a 25 FPS -> para (a 100% 2 s as cegas e muito)
 
 # =====================================================================
 # 9. CONES
