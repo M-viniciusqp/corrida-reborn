@@ -51,12 +51,14 @@ class Direcao:
         return self.turn
 
 
-def velocidade(turn, fator_cone=1.0, fps=30.0, proa_graus=0.0, erro_cm=0.0):
+def velocidade(turn, fator_cone=1.0, fps=30.0, proa_graus=0.0, erro_cm=0.0, curvatura=0.0):
     """Velocidade (0..1): reduz com o volante, com o carro torto/longe do centro
     (proa e erro grandes), com cone perto e com FPS baixo."""
     incerto = max(abs(proa_graus) / config.INCERTO_PROA_GRAUS,
                   abs(erro_cm) / config.INCERTO_ERRO_CM)
     v = config.VELOCIDADE_BASE * (1.0 - config.VEL_REDUCAO_CURVA * abs(turn))
+    # freia ANTES da curva: curvatura da faixa la na frente (1/cm; raio = 1/curvatura)
+    v *= 1.0 - config.VEL_REDUCAO_CURVATURA * min(1.0, abs(curvatura) / config.CURVATURA_CHEIA)
     v *= 1.0 - config.VEL_REDUCAO_INCERTO * min(1.0, incerto)
     v *= max(0.0, min(1.0, fator_cone))
     if fps < config.FPS_MINIMO:

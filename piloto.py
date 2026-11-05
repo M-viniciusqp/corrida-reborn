@@ -40,6 +40,7 @@ class Piloto:
         self.cones = []            # cones confirmados visiveis
         self.erro_cm = 0.0
         self.proa_graus = 0.0
+        self.curvatura = 0.0       # 1/cm, da faixa a frente (pra frear antes da curva)
         self.perdidos = 0
         self.motivo = "ok"
         self.eventos = []
@@ -86,9 +87,18 @@ class Piloto:
             proa = math.atan(inclin)
             self.erro_cm = erro
             self.proa_graus = math.degrees(proa)
+            # curvatura aproximada: variacao da inclinacao entre a metade perto e a longe
+            y_far = float(cam.y_max)
+            y_mid = 0.5 * (y_v + y_far)
+            if y_far - y_v > 20.0:
+                s1 = (float(centro.x(y_mid)) - float(centro.x(y_v))) / (y_mid - y_v)
+                s2 = (float(centro.x(y_far)) - float(centro.x(y_mid))) / (y_far - y_mid)
+                k = abs(s2 - s1) / (0.5 * (y_far - y_v))
+                self.curvatura = 0.5 * self.curvatura + 0.5 * k
 
             turn = self.direcao.atualizar(dt, erro, proa, v_cms)
-            speed = velocidade(turn, self.plan.fator_vel, fps, self.proa_graus, self.erro_cm)
+            speed = velocidade(turn, self.plan.fator_vel, fps, self.proa_graus, self.erro_cm,
+                               self.curvatura)
         else:
             self.perdidos += 1
             self.motivo = res.motivo
