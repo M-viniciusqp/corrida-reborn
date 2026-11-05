@@ -73,10 +73,16 @@ class Piloto:
             o = self.plan.atualizar(dt, self.cones, centro, v_cms)
             self.eventos.extend(self.plan.eventos)
 
-            y_e = max(cam.y_min, 0.0)
-            y_la = float(np.clip(config.OLHAR_ADIANTE_CM, y_e + 8.0, cam.y_max))
-            erro = float(centro.x(y_e)) + o
-            inclin = (float(centro.x(y_la)) - float(centro.x(y_e))) / (y_la - y_e)
+            # erro lateral NO EIXO (Y=0): se a camera so enxerga o chao a partir de
+            # y_min, a faixa e prolongada ate o eixo pela tangente (curto e seguro).
+            # Proa = inclinacao media da faixa numa janela de OLHAR_ADIANTE_CM a
+            # partir do que a camera ve (nao fica refem de 2 pontos colados).
+            y_v = max(cam.y_min, 0.0)
+            y_la = float(min(cam.y_max, y_v + config.OLHAR_ADIANTE_CM))
+            if y_la - y_v < 8.0:
+                y_v = max(0.0, y_la - 8.0)
+            erro = float(centro.x(0.0)) + o
+            inclin = (float(centro.x(y_la)) - float(centro.x(y_v))) / (y_la - y_v)
             proa = math.atan(inclin)
             self.erro_cm = erro
             self.proa_graus = math.degrees(proa)

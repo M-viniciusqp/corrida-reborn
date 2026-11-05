@@ -65,7 +65,7 @@ CAMERA_GIRAR_180 = False
 # Meça com uma trena e depois refine com calibrar_camera.py (que grava
 # dados/camera.json e passa a mandar sobre estes valores).
 # =====================================================================
-CAM_ALTURA_CM   = 22.0      # altura da lente em relacao ao chao
+CAM_ALTURA_CM   = 33.0      # altura da lente em relacao ao chao
 CAM_INCLINACAO  = 30.0     # graus pra BAIXO em relacao a horizontal (0 = olha reto)
 CAM_GUINADA     = 0.0       # graus pra esquerda(+) / direita(-) em relacao a frente
 CAM_ROLAGEM     = 0.0       # graus de giro da imagem (horizonte torto)
@@ -84,7 +84,7 @@ BEV_PX_POR_CM  = 3.0        # resolucao da vista de cima
 # 5. A PISTA (MEDIR). Duas faixas lado a lado: continua | pontilhada | continua.
 #    O carro anda na faixa A: pontilhada a ESQUERDA, continua a DIREITA.
 # =====================================================================
-FAIXA_LARGURA_CM  = 29.0    # de linha a linha (centro a centro) de UMA faixa
+FAIXA_LARGURA_CM  = 28.0    # de linha a linha (centro a centro) de UMA faixa
 LINHA_LARGURA_CM  = 3.0     # largura da tinta/fita branca
 CARRO_LARGURA_CM  = 20.0    # largura do carro (rodas externas)
 CARRO_COMPRIMENTO_CM = 28.0 # do eixo dianteiro ate a traseira (p/ saber quando passou do cone)
