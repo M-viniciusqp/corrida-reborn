@@ -105,23 +105,28 @@ O simulador usa física simples e câmera ideal: serve para achar erro de lógic
 
 ## Calibração automática (nada a fazer na pista)
 
-`python3 principal.py` cuida sozinho de três coisas:
+`python3 principal.py` se calibra sozinho:
 
-1. **Escala** (ao ligar, carro **parado, reto, na faixa**): mede a largura da faixa (distância
-   *perpendicular* entre as linhas) e corrige a altura da câmera para bater com `FAIXA_LARGURA_CM`.
-   Só muda até ±15%; fora disso mantém o salvo e avisa. (A busca automática de inclinação existe
-   mas fica **desligada**: no carro real ela se enganou. `AUTOCAL_INCLINACAO`.)
-2. **Potência mínima para andar** (`motor_auto.py`): abaixo de certa potência o motor não vence o
-   atrito e o carro **para** com o volante todo virado. O programa olha a própria câmera: se mandou
-   andar com o volante virado e o erro/proa não mudam, o carro está parado e ele sobe a potência
-   mínima de 5 em 5% até andar. O valor aprendido fica em `dados/motor.json` e vale nas próximas
-   corridas. Também dá um empurrão na largada.
-3. **Ruído da câmera parada**, que o item 2 usa para saber o que é "cena parada".
+1. **Direção** (1ª vez, ou `--recalibrar`; `calibracao_direcao.py`): o carro anda ~1,5 m e manda comandos
+   conhecidos (direita, esquerda). Pela câmera ele mede para que lado o carro girou e descobre:
+   - **se o volante está invertido** (e passa a compensar sozinho);
+   - **se o carro puxa para um lado** com o volante reto (centro do servo, rodas, motores) e calcula a
+     compensação. Fica em `dados/direcao.json`.
+   Precisa de: carro **reto, dentro da faixa, num trecho reto**, com ~1,5 m livre na frente. Depois ele
+   pede para você recolocar o carro no início e apertar Enter.
+2. **Escala** (toda vez, carro parado): mede a largura da faixa (distância *perpendicular* entre as
+   linhas) e corrige a altura da câmera para bater com `FAIXA_LARGURA_CM`. Só muda até ±15%.
+   (A busca automática de inclinação existe mas fica **desligada**: no carro real ela se enganou.)
+3. **Potência mínima para andar** (`motor_auto.py`): se mandou andar com o volante virado e o
+   erro/proa não mudam, o carro está parado e ele sobe a potência mínima de 5 em 5% até andar.
+   Fica em `dados/motor.json`.
 
 Uma vez só (fica salvo em `dados/`, não precisa repetir):
 - inclinação/guinada/rolagem da câmera → `calibrar_camera.py` (`p` grava `dados/camera.json`)
 - centro e limites do servo → `teste_servo.py` (grava `dados/servo.json`)
-- carro puxando para um lado → `teste_reta.py`
+
+Testar a calibração da direção sem o carro: `python teste_autodirecao.py` (simula carros com volante
+invertido e puxando para um lado).
 
 ## Velocidade
 

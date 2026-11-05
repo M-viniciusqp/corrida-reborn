@@ -84,6 +84,12 @@ BEV_PX_POR_CM  = 3.0        # resolucao da vista de cima
 # Ao ligar, com o carro parado na faixa, mede a largura da faixa e corrige a
 # ESCALA (altura da camera) sozinho. Nao corrige inclinacao/guinada/rolagem.
 AUTOCALIBRAR = True
+AUTOCAL_DIRECAO = True        # 1a vez: o carro anda ~1.5 m e descobre sozinho pra que lado o volante vira
+                              # e se puxa pra um lado (grava dados/direcao.json; --recalibrar refaz)
+CAL_DIR_VEL = 0.65            # potencia durante a calibracao da direcao
+CAL_DIR_TURN = 0.3            # comando de volante usado nos testes (+-)
+CAL_DIR_KMIN = 15.0           # ganho minimo (graus/s por unidade) pra confiar na medida
+CAL_DIR_TRIM_MAX = 0.35       # compensacao maxima do puxao do carro
 AUTOCAL_INCLINACAO = False    # a busca de inclinacao pelo paralelismo se enganou no carro real
                               # (foi a 45 graus e desmontou a geometria): so a ESCALA e ajustada
 AUTOCAL_INCLINACAO_MAX = 6.0  # se ligar: nunca muda mais que isso
@@ -147,7 +153,7 @@ PROA_PESO           = 1.0     # peso do termo de proa
 ERRO_ZONA_MORTA_CM  = 0.6
 ESTERCO_SUAVIZACAO  = 0.55    # EMA do comando de volante (1 = sem filtro)
 ESTERCO_SLEW        = 6.0     # maximo de variacao do turn (-1..1) por segundo
-ESTERCO_INVERTER    = True    # o volante deste carro esterca pro lado oposto ao esperado (visto no teste)
+ESTERCO_INVERTER    = False    # o volante deste carro esterca pro lado oposto ao esperado (visto no teste)
 
 # =====================================================================
 # 8. VELOCIDADE (0..1)

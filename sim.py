@@ -81,14 +81,18 @@ class Carro:
         self.delta = 0.0
         self.v = 0.0
         self.limiar = 0.0               # potencia minima pra se mover (atrito)
+        self.invertido = config.ESTERCO_INVERTER   # volante fisico invertido
+        self.vies_graus = 0.0           # roda puxa pra um lado mesmo com o comando em 0 (+ = direita)
 
     def frente(self):
         return self.p + self.Lb * np.array([math.sin(self.psi), math.cos(self.psi)])
 
     def passo(self, turn, speed, dt, fator_v=1.0, atraso=0.12):
+        # a direcao FISICA pode estar invertida e/ou puxar pra um lado (centro do servo errado)
         delta_cmd = math.radians(config.ESTERCO_MAX_GRAUS) * turn
-        if config.ESTERCO_INVERTER:
+        if self.invertido:
             delta_cmd = -delta_cmd
+        delta_cmd += math.radians(self.vies_graus)
         alvo_v = (speed * config.V_CMS_NA_VEL_1 * fator_v) if speed >= self.limiar else 0.0
         n = max(1, int(dt / 0.01))
         h = dt / n

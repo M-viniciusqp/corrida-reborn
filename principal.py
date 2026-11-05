@@ -12,6 +12,8 @@ Opcoes:
     --camera N    numero da camera (ou caminho de um video, pra testar no PC)
     --vel V       velocidade base so desta corrida (ex.: --vel 0.4), sem mexer no config.py
     --sem-autocal nao autocalibra a escala ao ligar (padrao: autocalibra com o carro parado)
+    --recalibrar  refaz a calibracao da DIRECAO (sentido do volante e puxao): o carro anda ~1,5 m.
+                  Na 1a vez ela roda sozinha; depois fica salva em dados/direcao.json.
     --sem-log     nao grava a pasta logs/
     --simulado    GPIO de mentira (testa o programa sem o carro)
 
@@ -26,6 +28,7 @@ import time
 
 import cv2
 
+import calibracao_direcao
 import config
 import hardware
 from camera import abrir_camera, ajustar, CameraThread
@@ -46,6 +49,8 @@ def main():
     ap.add_argument("--simulado", action="store_true")
     ap.add_argument("--sem-autocal", action="store_true",
                     help="nao autocalibra a escala ao ligar")
+    ap.add_argument("--recalibrar", action="store_true",
+                    help="refaz a calibracao da direcao (o carro anda ~1,5 m)")
     ap.add_argument("--vel", type=float, default=None,
                     help="velocidade base desta corrida (0..1), sem mexer no config.py")
     a = ap.parse_args()
@@ -98,6 +103,56 @@ def main():
             print("(hardware simulado: nada vai se mexer)")
     else:
         print("MODO SECO: motores e servo desligados.")
+
+    # ---- calibracao da direcao: o carro descobre sozinho pra que lado o volante vira e
+    # se puxa pra um lado (1a vez, ou --recalibrar). O resultado fica em dados/direcao.json.
+    dir_cal = calibracao_direcao.carregar()
+    if servo is not None and config.AUTOCAL_DIRECAO and (dir_cal is None or a.recalibrar):
+        print("\nCALIBRACAO DA DIRECAO (so na 1a vez ou com --recalibrar): o carro vai andar uns "
+              "1,5 m e virar um pouco pros dois lados.\nCarro RETO, DENTRO da faixa, num trecho RETO "
+              "da pista, com espaco livre na frente. SAIA DA FRENTE!")
+        for i in (3, 2, 1):
+            print(f"  comecando em {i}...")
+            time.sleep(1.0)
+        ultimo = {"idx": -1}
+
+        def passo(turn_raw, speed):
+            servo.virar(turn_raw)
+            motores.andar(speed)
+            while True:
+                f, idx, idade = thread.read()
+                if f is not None and idx != ultimo["idx"] and idade < 0.3:
+                    ultimo["idx"] = idx
+                    return ajustar(f), time.time()
+                time.sleep(0.002)
+
+        try:
+            r = calibracao_direcao.calibrar(Piloto(params, config.CAMERA_RES, piso=piso_salvo), passo)
+        except KeyboardInterrupt:
+            r = {"ok": False, "motivo": "interrompida (Ctrl+C)"}
+        finally:
+            motores.parar()
+            servo.virar(0.0)
+            time.sleep(0.6)
+        if r["ok"]:
+            calibracao_direcao.salvar(r)
+            dir_cal = calibracao_direcao.carregar()
+            print("  calibracao da direcao: " + r["motivo"] + "  [salva em dados/direcao.json]")
+        else:
+            print("  calibracao da direcao NAO concluida: " + r["motivo"] +
+                  "\n  (segue com os padroes do config.py; tente de novo com --recalibrar)")
+        if os.isatty(0):
+            try:
+                input("\nRecoloque o carro NO INICIO da pista, reto, e aperte Enter pra largar... ")
+            except (EOFError, KeyboardInterrupt):
+                pass
+    if dir_cal is not None:
+        piloto.direcao.inverter = dir_cal["inverter"]
+        piloto.direcao.trim = dir_cal["trim"]
+        print(f"Direcao: volante {'INVERTIDO' if dir_cal['inverter'] else 'normal'}, "
+              f"compensacao {dir_cal['trim']:+.2f} (dados/direcao.json)")
+    else:
+        print(f"Direcao: padrao do config.py (inverter={config.ESTERCO_INVERTER})")
 
     registro = None if a.sem_log else Registro()
     if registro:

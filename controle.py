@@ -24,9 +24,17 @@ class Direcao:
         self.turn = 0.0
         self.delta_graus = 0.0
         self.termos = (0.0, 0.0)       # (proa, lateral) em graus, so pra log
+        # Descobertos pela calibracao da direcao (calibracao_direcao.py): o config.py e so o padrao.
+        self.inverter = config.ESTERCO_INVERTER   # o volante vira pro lado oposto ao comandado
+        self.trim = 0.0                           # comando que faz o carro andar RETO (-1..1, ja no
+                                                  # dominio do que vai pro servo)
 
     def reset(self):
         self.turn = 0.0
+
+    def saida(self):
+        """Comando final pro servo: estado + trim (carro que puxa pra um lado)."""
+        return max(-1.0, min(1.0, self.turn + self.trim))
 
     def atualizar(self, dt, erro_cm, proa_rad, v_cms):
         if abs(erro_cm) < config.ERRO_ZONA_MORTA_CM:
@@ -37,18 +45,18 @@ class Direcao:
         self.delta_graus = math.degrees(delta)
         self.termos = (math.degrees(t_proa), math.degrees(t_lat))
         alvo = max(-1.0, min(1.0, self.delta_graus / config.ESTERCO_MAX_GRAUS))
-        if config.ESTERCO_INVERTER:
+        if self.inverter:
             alvo = -alvo
         a = config.ESTERCO_SUAVIZACAO
         novo = a * alvo + (1 - a) * self.turn
         passo = config.ESTERCO_SLEW * dt
         novo = max(self.turn - passo, min(self.turn + passo, novo))
         self.turn = max(-1.0, min(1.0, novo))
-        return self.turn
+        return self.saida()
 
     def decair(self, fator=0.9):
         self.turn *= fator
-        return self.turn
+        return self.saida()
 
 
 def velocidade(turn, fator_cone=1.0, fps=30.0, proa_graus=0.0, erro_cm=0.0, curvatura=0.0):
