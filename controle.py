@@ -28,6 +28,8 @@ class Direcao:
         self.inverter = config.ESTERCO_INVERTER   # o volante vira pro lado oposto ao comandado
         self.trim = 0.0                           # comando que faz o carro andar RETO (-1..1, ja no
                                                   # dominio do que vai pro servo)
+        self.espelho = False                      # imagem espelhada (continua a esquerda): o erro vem
+                                                  # com o sinal trocado
 
     def reset(self):
         self.turn = 0.0
@@ -45,7 +47,7 @@ class Direcao:
         self.delta_graus = math.degrees(delta)
         self.termos = (math.degrees(t_proa), math.degrees(t_lat))
         alvo = max(-1.0, min(1.0, self.delta_graus / config.ESTERCO_MAX_GRAUS))
-        if self.inverter:
+        if self.inverter != self.espelho:      # volante invertido XOR imagem espelhada
             alvo = -alvo
         a = config.ESTERCO_SUAVIZACAO
         novo = a * alvo + (1 - a) * self.turn

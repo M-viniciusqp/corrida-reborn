@@ -15,6 +15,7 @@ simulador (sim.py).
 import math
 import time
 
+import cv2
 import numpy as np
 
 import config
@@ -48,6 +49,9 @@ class Piloto:
         self._t_ant = None
         self._perdido_avisado = False
         self.gov = GovernadorMotor(piso)   # piso de potencia aprendido + empurrao de largada
+        self.espelhar = False      # continua a ESQUERDA: espelha a imagem (o resto assume continua a direita)
+        self.frame_proc = None     # quadro realmente processado (espelhado ou nao), pro HUD
+        self.deslocamento_cm = 0.0 # alvo lateral aplicado (vies da pontilhada + desvio), pro HUD
 
     # ------------------------------------------------------------------
     def step(self, t, frame, fps=30.0, debug=False):
@@ -55,6 +59,10 @@ class Piloto:
         dt = 0.05 if self._t_ant is None else min(0.3, max(0.01, t - self._t_ant))
         self._t_ant = t
         cam = self.cam
+        if self.espelhar:
+            frame = cv2.flip(frame, 1)
+        self.frame_proc = frame
+        self.direcao.espelho = self.espelhar
 
         res = self.faixas.processar(frame, debug=debug)
         self.res = res
@@ -74,6 +82,10 @@ class Piloto:
             self.motivo = "ok"
             centro = res.centro
             o = self.plan.atualizar(dt, self.cones, centro, v_cms)
+            # linha de corrida: mais perto da pontilhada (sempre a ESQUERDA no mundo ja espelhado)
+            vies = -min(0.9, max(0.0, config.VIES_PONTILHADA_FRAC)) * 0.5 * config.FAIXA_LARGURA_CM
+            o += vies
+            self.deslocamento_cm = o
             self.eventos.extend(self.plan.eventos)
 
             # erro lateral NO EIXO (Y=0): se a camera so enxerga o chao a partir de

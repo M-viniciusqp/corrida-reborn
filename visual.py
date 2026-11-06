@@ -43,7 +43,7 @@ def desenhar_bev(piloto, escala=1.0):
     if res.centro is not None:
         pts = np.array([cam.chao_para_bev(float(res.centro.x(yy)), float(yy)) for yy in Ys], np.int32)
         cv2.polylines(img, [pts], False, (0, 255, 0), 2, cv2.LINE_AA)
-        o = piloto.plan.o_cmd
+        o = getattr(piloto, 'deslocamento_cm', piloto.plan.o_cmd)
         pts2 = np.array([cam.chao_para_bev(float(res.centro.x(yy)) + o, float(yy)) for yy in Ys], np.int32)
         cv2.polylines(img, [pts2], False, (0, 255, 255), 2, cv2.LINE_AA)
     for c in piloto.cones:
@@ -74,7 +74,7 @@ def desenhar_camera(piloto, frame):
         Ys = np.linspace(cam.y_min, cam.y_max, 20)
         pts = []
         for yy in Ys:
-            p = cam.chao_para_pixel(float(res.centro.x(yy) + piloto.plan.o_cmd), float(yy))
+            p = cam.chao_para_pixel(float(res.centro.x(yy) + getattr(piloto, 'deslocamento_cm', piloto.plan.o_cmd)), float(yy))
             if p is not None:
                 pts.append(p)
         if len(pts) > 1:
@@ -84,6 +84,8 @@ def desenhar_camera(piloto, frame):
 
 def compor(piloto, frame):
     """Camera (com marcas) | BEV, mais uma linha de texto com o estado."""
+    if getattr(piloto, "frame_proc", None) is not None:
+        frame = piloto.frame_proc          # o que o piloto realmente viu (espelhado ou nao)
     cam_img = desenhar_camera(piloto, frame)
     bev = desenhar_bev(piloto)
     h = max(cam_img.shape[0], bev.shape[0])
@@ -93,7 +95,7 @@ def compor(piloto, frame):
         return im
     mosaico = np.hstack([preenche(cam_img), preenche(bev)])
     estado = (f"erro {piloto.erro_cm:+.1f}cm proa {piloto.proa_graus:+.1f} turn {piloto.turn:+.2f} "
-              f"vel {piloto.speed:.2f} desvio {piloto.plan.o_cmd:+.1f}cm [{piloto.plan.estado}]"
+              f"vel {piloto.speed:.2f} desvio {getattr(piloto, 'deslocamento_cm', piloto.plan.o_cmd):+.1f}cm [{piloto.plan.estado}]"
               + ("" if piloto.motivo == "ok" else f" | {piloto.motivo}"))
     _txt(mosaico, estado, (6, 14), (0, 255, 255))
     return mosaico

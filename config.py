@@ -105,6 +105,16 @@ CARRO_LARGURA_CM  = 20.0    # largura do carro (rodas externas)
 CARRO_COMPRIMENTO_CM = 28.0 # do eixo dianteiro ate a traseira (p/ saber quando passou do cone)
 CONE_LARGURA_CM   = 18.0    # largura da BASE do cone
 
+# De que lado fica a faixa CONTINUA na sua faixa: "direita", "esquerda" ou "auto".
+# "auto": ao ligar, o carro mede qual das duas linhas ao lado dele e continua (a pontilhada tem
+# buracos) e, se for a da esquerda, ESPELHA a imagem: o resto do codigo nao muda.
+LADO_CONTINUO = "auto"
+
+# Linha de corrida: anda mais perto da PONTILHADA que do centro da faixa (ela pode ser
+# cruzada; a continua nao). 0 = centro; 1 = meia faixa pro lado da pontilhada.
+# O gatuno-rapido usava 0.85. Aqui 0.50 (simulador: ate 0.70 passa); suba aos poucos no carro real.
+VIES_PONTILHADA_FRAC = 0.50
+
 # =====================================================================
 # 6. VISAO DAS FAIXAS
 # Realce de linha por "diferenca de gaussianas" (centro - entorno) em vez de
@@ -177,7 +187,7 @@ STALL_ACUM_FRACO_S  = 2.0     # prova FRACA (so imagem parada, volante reto) pre
 STALL_FRACO_VEL_MAX = 0.70    # ... e so vale com potencia baixa (a 0.85 o carro anda de certeza)
 PISO_PASSO          = 0.05
 PISO_MAX            = 0.95    # teto com prova forte
-PISO_MAX_FRACO      = 0.55    # teto com prova fraca (reta lisa parece parada)
+PISO_MAX_FRACO      = 0.70    # teto com prova fraca (reta lisa parece parada); so vale com potencia < STALL_FRACO_VEL_MAX
 VEL_REDUCAO_CURVA   = 0.35    # tira ate isso da velocidade com o volante todo
 VEL_REDUCAO_INCERTO = 0.40    # tira ate isso quando a proa/erro estao grandes (carro torto na pista)
 INCERTO_PROA_GRAUS  = 25.0    # proa que conta como 'torto' total

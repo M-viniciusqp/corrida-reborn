@@ -92,6 +92,12 @@ def main():
             piloto = Piloto(params, config.CAMERA_RES, piso=piso_salvo)
             print(f"  {piloto.cam.resumo()}")
         piloto.gov.ruido = max(0.3, info.get("ruido", 0.6))
+        lado_continuo = info.get("lado_continuo", "direita")
+    else:
+        lado_continuo = config.LADO_CONTINUO if config.LADO_CONTINUO in ("direita", "esquerda") else "direita"
+    piloto.espelhar = (lado_continuo == "esquerda")
+    print(f"Faixa continua a {lado_continuo.upper()}" +
+          (" (imagem espelhada pro processamento)" if piloto.espelhar else ""))
 
     servo = motores = None
     if not a.seco:
@@ -127,7 +133,9 @@ def main():
                 time.sleep(0.002)
 
         try:
-            r = calibracao_direcao.calibrar(Piloto(params, config.CAMERA_RES, piso=piso_salvo), passo)
+            cal_piloto = Piloto(params, config.CAMERA_RES, piso=piso_salvo)
+            cal_piloto.espelhar = piloto.espelhar
+            r = calibracao_direcao.calibrar(cal_piloto, passo)
         except KeyboardInterrupt:
             r = {"ok": False, "motivo": "interrompida (Ctrl+C)"}
         finally:

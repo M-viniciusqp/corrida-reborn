@@ -106,7 +106,9 @@ def calibrar(piloto, passo, log=print):
                           f"{config.CAL_DIR_KMIN:.0f}). Servo solto, roda travada ou pouca potencia?"}
     base = 0.5 * (yr + yl)                       # giro com comando 0 (interpolado entre os dois testes)
     trim = float(np.clip(-base / K, -config.CAL_DIR_TRIM_MAX, config.CAL_DIR_TRIM_MAX))
-    return {"ok": True, "inverter": K < 0, "trim": trim, "K": K,
-            "motivo": (f"volante {'INVERTIDO' if K < 0 else 'normal'} (ganho {K:+.0f} graus/s por unidade); "
+    espelho = bool(getattr(piloto, "espelhar", False))     # imagem espelhada inverte o sinal medido
+    inverter = (K < 0) != espelho
+    return {"ok": True, "inverter": inverter, "trim": trim, "K": K,
+            "motivo": (f"volante {'INVERTIDO' if inverter else 'normal'} (ganho {K:+.0f} graus/s por unidade); "
                        f"carro {'puxa pra ' + ('direita' if base > 0 else 'esquerda') if abs(base) > 3 else 'anda reto'}"
                        f" ({base:+.1f} graus/s) -> compensacao {trim:+.2f}")}

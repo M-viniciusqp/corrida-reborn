@@ -22,6 +22,7 @@ mantem o que esta salvo (calibrar_camera.py grava dados/camera.json).
 import math
 import time
 
+import cv2
 import numpy as np
 
 import config
@@ -111,6 +112,32 @@ def _acertar_inclinacao(params, frames):
     return melhor_inc, f"inclinacao {p0:.1f} -> {melhor_inc:.1f} graus (linhas paralelas)"
 
 
+def detectar_lado(params, frames):
+    """Qual das duas linhas ao lado do carro e a CONTINUA? Devolve 'direita', 'esquerda' ou None.
+    A pontilhada tem buracos, entao tem MENOS tinta ao longo do comprimento (cobertura baixa).
+    Compara a cobertura da linha mais proxima de cada lado, quadro a quadro."""
+    cam = CameraChao(params, config.CAMERA_RES)
+    det = DetectorFaixas(cam)
+    y = float(np.clip(config.OLHAR_ADIANTE_CM, cam.y_min, cam.y_max))
+    esq, dire = [], []
+    for fr in frames:
+        res = det.processar(fr)
+        lin = [l for l in res.linhas if l.cobertura is not None]
+        left = [l for l in lin if -0.9 * config.FAIXA_LARGURA_CM < float(l.x(y)) < 0]
+        right = [l for l in lin if 0 < float(l.x(y)) < 0.9 * config.FAIXA_LARGURA_CM]
+        if left and right:
+            esq.append(max(left, key=lambda l: float(l.x(y))).cobertura)     # a mais perto, a esquerda
+            dire.append(min(right, key=lambda l: float(l.x(y))).cobertura)   # a mais perto, a direita
+    if len(esq) < max(3, len(frames) // 3):
+        return None
+    dif = float(np.median(dire) - np.median(esq))
+    if dif > 0.2:
+        return "direita"
+    if dif < -0.2:
+        return "esquerda"
+    return None
+
+
 def _largura(params, frames):
     """Mediana da distancia entre linhas vizinhas identificadas (D-A, B-D) com a
     geometria dada, passando as imagens duas vezes pra classificacao assentar."""
@@ -153,6 +180,20 @@ def autocalibrar(params, ler_frame, duracao=2.0, log=print):
 
     novo = dict(params)
     partes = []
+
+    # 0) de que lado esta a continua (so se LADO_CONTINUO == "auto"); se for a esquerda a imagem
+    #    e ESPELHADA pro resto da calibracao, que assume a continua a direita
+    lado = config.LADO_CONTINUO if config.LADO_CONTINUO in ("direita", "esquerda") else None
+    if config.LADO_CONTINUO == "auto":
+        try:
+            lado = detectar_lado(novo, frames)
+        except ValueError:
+            lado = None
+        partes.append(f"continua a {lado.upper()} (medido)" if lado else
+                      "nao deu pra ver qual linha e a continua; assumi DIREITA")
+    info["lado_continuo"] = lado or "direita"
+    if info["lado_continuo"] == "esquerda":
+        frames = [cv2.flip(f, 1) for f in frames]
 
     # 1) inclinacao pelo paralelismo (DESLIGADA por padrao: no carro real ela se enganou)
     if config.AUTOCAL_INCLINACAO:

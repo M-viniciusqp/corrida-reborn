@@ -53,14 +53,14 @@ class Linha:
             der = np.polyval(np.polyder(self.coef), Yc)
         else:
             der = np.full_like(Yc, self.coef[0])
-        der = np.clip(der, -0.8, 0.8)
+        der = np.clip(der, -1.3, 1.3)
         return base + der * (Y - Yc)
 
     def inclinacao(self, Y):
         Yc = np.clip(Y, self.y0, self.y1)
         if len(self.coef) > 2:
-            return float(np.clip(np.polyval(np.polyder(self.coef), Yc), -0.8, 0.8))
-        return float(np.clip(self.coef[0], -0.8, 0.8))
+            return float(np.clip(np.polyval(np.polyder(self.coef), Yc), -1.3, 1.3))
+        return float(np.clip(self.coef[0], -1.3, 1.3))
 
 
 def espacamento_perp(la, lb, y):
@@ -87,12 +87,12 @@ class Centro:
         Yc = np.clip(Y, self.y0, self.y1)
         base = np.polyval(self.coef, Yc)
         der = np.polyval(np.polyder(self.coef), Yc) if self.grau >= 2 else self.coef[0]
-        return base + np.clip(der, -0.8, 0.8) * (Y - Yc)
+        return base + np.clip(der, -1.3, 1.3) * (Y - Yc)
 
     def inclinacao(self, Y):
         Yc = np.clip(Y, self.y0, self.y1)
         der = np.polyval(np.polyder(self.coef), Yc) if self.grau >= 2 else self.coef[0]
-        return float(np.clip(der, -0.8, 0.8))
+        return float(np.clip(der, -1.3, 1.3))
 
 
 class ResultadoFaixas:
@@ -166,7 +166,7 @@ class DetectorFaixas:
         c_ref = float(centro.x(y_ref))
         self._sem_centro = 0
         self._religou = False
-        self._slope = float(np.clip(0.5 * self._slope + 0.5 * centro.inclinacao(y_ref), -0.6, 0.6))
+        self._slope = float(np.clip(0.5 * self._slope + 0.5 * centro.inclinacao(y_ref), -0.9, 0.9))
         self.c_prev = c_ref
         self._tem_prev = True
         res.centro = centro
@@ -222,7 +222,7 @@ class DetectorFaixas:
         Y = cam.y_max - ys / cam.px_cm
         linhas = []
         y_ref = 0.5 * (cam.y_min + cam.y_max)
-        slopes = np.linspace(-0.7, 0.7, 29)
+        slopes = np.linspace(-1.2, 1.2, 49)
         res_x = 1.0                                         # cm por bin
         margem = config.JANELA_MARGEM_CM
         kernel = np.ones((1, 5), np.float32) / 5.0
@@ -235,7 +235,7 @@ class DetectorFaixas:
                 idx_sub = self.rng.choice(X.size, 5000, replace=False)
             Xs, Ys = X[idx_sub], Y[idx_sub]
             x0 = Xs[None, :] - slopes[:, None] * (Ys[None, :] - y_ref)      # (S, N)
-            lim = cam.x_max + 0.7 * (cam.y_max - cam.y_min) + 2
+            lim = cam.x_max + 1.2 * (cam.y_max - cam.y_min) + 2
             nb = int(2 * lim / res_x) + 1
             ib = np.clip(((x0 + lim) / res_x).astype(np.int32), 0, nb - 1)
             flat = (np.arange(len(slopes))[:, None] * nb + ib).ravel()
@@ -284,7 +284,7 @@ class DetectorFaixas:
             return None
         if residuo > config.LINHA_RESIDUO_MAX_CM:
             return None
-        if abs(float(np.polyval(np.polyder(coef), 0.5 * (y0 + y1)))) > 0.75:
+        if abs(float(np.polyval(np.polyder(coef), 0.5 * (y0 + y1)))) > 1.15:
             return None                            # quase deitada: nao e linha da pista
         return Linha(coef, y0, y1, int(sel.sum()), residuo)
 

@@ -39,7 +39,8 @@ PAREDE = (120, 125, 130)
 class Pista:
     """Linha central integrada de trechos (comprimento_cm, curvatura 1/cm; + = direita)."""
 
-    def __init__(self, trechos, cones=(), traco=(12.0, 12.0)):
+    def __init__(self, trechos, cones=(), traco=(12.0, 12.0), espelhada=False):
+        self.espelhada = espelhada       # continua a ESQUERDA da faixa do carro, pontilhada a direita
         self.cones = [dict(x=c[0], y=c[1]) for c in cones]   # (s_cm, d_cm da faixa A, + direita)
         self.traco = traco
         pts, psis, S = [], [], []
@@ -69,6 +70,8 @@ class Pista:
 
     def linhas(self):
         """[(offset d, 'continua'|'pontilhada')] da faixa A + vizinha."""
+        if self.espelhada:
+            return [(1.5 * W, "continua"), (0.5 * W, "pontilhada"), (-0.5 * W, "continua")]
         return [(-1.5 * W, "continua"), (-0.5 * W, "pontilhada"), (0.5 * W, "continua")]
 
 
@@ -180,6 +183,8 @@ class Renderizador:
 def pose_stats(pista, carro, cones_mundo):
     f = carro.frente()
     s, d, _ = pista.lane(f)
+    if pista.espelhada:
+        d = -d                           # mundo espelhado: as contas de invasao sao simetricas
     meia = config.CARRO_LARGURA_CM / 2.0
     fora_dir = d + meia - (W / 2.0)           # > 0: passou da continua
     fora_esq = (-1.5 * W) - (d - meia)        # > 0: passou da continua da outra faixa
@@ -222,6 +227,12 @@ def cenario(nome):
         return Pista([(150, 0.0), (180, 1 / 130.0), (200, 0.0)], traco=(7.0, 45.0)), dict()
     if nome == "curva_esq_traco_raro":
         return Pista([(150, 0.0), (180, -1 / 130.0), (200, 0.0)], traco=(7.0, 45.0)), dict()
+    if nome == "reta_espelhada":
+        return Pista([(450, 0.0)], espelhada=True), dict(d0=-3, psi0=math.radians(-2))
+    if nome == "curva_dir_espelhada":
+        return Pista([(150, 0.0), (180, 1 / 130.0), (200, 0.0)], espelhada=True), dict()
+    if nome == "curva_esq_espelhada":
+        return Pista([(150, 0.0), (180, -1 / 130.0), (200, 0.0)], espelhada=True), dict()
     if nome == "curva_cone":
         return Pista([(120, 0.0), (220, 1 / 150.0), (200, 0.0)], cones=[(260, 2)]), dict()
     raise SystemExit(f"cenario desconhecido: {nome}")
@@ -232,11 +243,20 @@ NOMES = ["reta", "reta_desalinhado", "cone_centro", "cone_direita", "cone_esquer
          "cone_outra_faixa", "dois_cones", "curva_dir", "curva_esq", "curva_cone"]
 
 
-def rodar(nome, ver=False, erro_cam=False, salvar=None, fps=12.0, fator_v=1.0, quiet=False, limiar=0.0):
+def rodar(nome, ver=False, erro_cam=False, salvar=None, fps=12.0, fator_v=1.0, quiet=False, limiar=0.0,
+          lado="direita", vies=None):
     pista, kw = cenario(nome)
     params = parametros_padrao()
     res = config.CAMERA_RES
     piloto = Piloto(params, res)
+    if lado == "auto":                         # o carro decide sozinho olhando as primeiras imagens
+        import autocal
+        _rd = Renderizador(CameraChao(params, res), res)
+        _c0 = Carro(pista, **kw)
+        lado = autocal.detectar_lado(params, [_rd.quadro(pista, _c0) for _ in range(8)]) or "direita"
+    piloto.espelhar = (lado == "esquerda")
+    if vies is not None:
+        config.VIES_PONTILHADA_FRAC = vies
     real = dict(params)
     if erro_cam:     # a camera de verdade nao esta exatamente como se mediu
         real["inclinacao"] += 2.0

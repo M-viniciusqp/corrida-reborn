@@ -15,6 +15,24 @@ Faz a mesma tarefa do `gatuno-rapido`, mas com outra lógica, pensada para o car
 | Direção | PID no erro | **Stanley** (erro lateral + proa) |
 | Cone | para, analisa, desvia | desvio **contínuo** planejado em cm (sem parar) |
 
+## Relação com o gatuno-rapido (mesmo objetivo, lógica nova)
+
+Este projeto parte do `gatuno-rapido` (seguir a pista entre as faixas, o mais rápido possível, com
+1 câmera) e mantém **o que ele faz**, mas refaz **como**:
+
+| Função do gatuno-rapido | Aqui |
+|---|---|
+| Achar o centro da pista | BEV em **cm** + votação de linhas + curva (em vez de varredura de fileiras) |
+| Direção | **Stanley** (erro lateral + proa), em vez de PID |
+| Descobrir sozinho qual lado é a faixa **contínua** (por buracos da pontilhada) e travar | `LADO_CONTINUO = "auto"`: mede a **cobertura** das linhas ao ligar e, se a contínua estiver à esquerda, **espelha a imagem** (o resto do código não muda) |
+| Andar mais perto da **pontilhada** que do centro (`LANE_BIAS_FRAC`) | `VIES_PONTILHADA_FRAC` (0,50), em cm |
+| Velocidade máxima, freio em curva fechada, freio por FPS baixo | Reta no máximo; **freia antes da curva** (curvatura à frente), piso de potência, freio por FPS |
+| Perdeu a pista: decai o volante e anda devagar, depois para | Igual, mas a parada é mais cedo e nunca abaixo do piso do motor |
+| `teste_servo`, `test_control`, `test_vision` | `teste_servo.py`, `teste_motores.py`, `teste_reta.py`, `calibrar_camera.py`, `teste_autodirecao.py` e o **simulador** (`sim.py`) |
+
+Novo em relação ao original: calibração automática (escala da câmera, sentido do volante, puxão do
+carro, potência mínima), pista com a contínua dos dois lados e o simulador em malha fechada.
+
 ## Pinagem (BCM) — confira antes de ligar
 
 | Função | GPIO | Pino físico | Liga em |
