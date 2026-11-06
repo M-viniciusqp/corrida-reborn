@@ -37,6 +37,54 @@ class _CapFoto:
         pass
 
 
+def _abrir_indice(indice, res, fps):
+    if sys.platform.startswith("linux"):
+        cap = cv2.VideoCapture(indice, cv2.CAP_V4L2)
+    else:
+        cap = cv2.VideoCapture(indice)
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))   # MJPG: bem mais leve no USB
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, res[0])
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, res[1])
+    cap.set(cv2.CAP_PROP_FPS, fps)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    return cap
+
+
+def _procurar_outra(preferida, res, fps):
+    """Depois de uma queda de energia/USB a webcam costuma voltar com OUTRO numero (video2 em vez de
+    video0). Tenta os /dev/video* que existem e fica com o primeiro que entrega imagem de verdade."""
+    import glob
+    import re
+    nums = sorted(int(m.group(1)) for p in glob.glob("/dev/video*")
+                  if (m := re.search(r"video(\d+)$", p)))
+    candidatos = [n for n in nums if n != preferida and n < 20]
+    if not candidatos:
+        return None
+    try:                                   # silencia os avisos do OpenCV nos que nao sao camera
+        nivel = cv2.utils.logging.getLogLevel()
+        cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_SILENT)
+    except Exception:
+        nivel = None
+    achada = None
+    try:
+        for n in candidatos:
+            cap = _abrir_indice(n, res, fps)
+            if cap.isOpened():
+                ok, frame = cap.read()
+                if ok and frame is not None and frame.ndim == 3 and frame.shape[1] >= 160:
+                    achada = (n, cap)
+                    break
+            cap.release()
+    finally:
+        if nivel is not None:
+            cv2.utils.logging.setLogLevel(nivel)
+    if achada:
+        print(f"AVISO: a camera {preferida} nao abre; usando /dev/video{achada[0]} (que entrega imagem). "
+              f"Se isso se repetir, ponha CAMERA_ID = {achada[0]} no config.py.")
+        return achada[1]
+    return None
+
+
 def abrir_camera(fonte=None, res=None, fps=None):
     """fonte: numero da camera (0, 1...) ou caminho de um video/foto. None = config."""
     res = res or config.CAMERA_CAPTURA_RES
@@ -50,19 +98,14 @@ def abrir_camera(fonte=None, res=None, fps=None):
         print(f"Fonte de imagem: arquivo {fonte}")
         return cap
     indice = int(fonte)
-    if sys.platform.startswith("linux"):
-        cap = cv2.VideoCapture(indice, cv2.CAP_V4L2)
-    else:
-        cap = cv2.VideoCapture(indice)
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))   # MJPG: bem mais leve no USB
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, res[0])
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, res[1])
-    cap.set(cv2.CAP_PROP_FPS, fps)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    cap = _abrir_indice(indice, res, fps)
+    if not cap.isOpened():
+        cap = _procurar_outra(indice, res, fps) or cap       # a camera pode ter mudado de numero
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = int(cap.get(cv2.CAP_PROP_FOURCC))
     fcc = "".join(chr((fourcc >> 8 * i) & 0xFF) for i in range(4))
+    fcc = "".join(c if 32 <= ord(c) < 127 else "?" for c in fcc)       # formato invalido nao pode quebrar o print
     print(f"Camera {indice}: {w}x{h} formato={fcc.strip()}")
     pw, ph = config.CAMERA_RES
     if h and abs(w / h - pw / ph) > 0.05:
