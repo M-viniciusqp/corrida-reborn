@@ -10,6 +10,7 @@ Opcoes:
     --ver         abre as janelas no PROPRIO Raspberry (terminal da area de trabalho)
     --tempo S     para sozinho depois de S segundos
     --camera N    numero da camera (ou caminho de um video, pra testar no PC)
+    --maximo      SEMPRE 100% de potencia, sem nenhuma freada (so desta corrida)
     --vel V       velocidade base so desta corrida (ex.: --vel 0.4), sem mexer no config.py
     --sem-autocal nao autocalibra a escala ao ligar (padrao: autocalibra com o carro parado)
     --recalibrar  refaz a calibracao da DIRECAO (sentido do volante e puxao): o carro anda ~1,5 m.
@@ -49,11 +50,16 @@ def main():
     ap.add_argument("--simulado", action="store_true")
     ap.add_argument("--sem-autocal", action="store_true",
                     help="nao autocalibra a escala ao ligar")
+    ap.add_argument("--maximo", action="store_true",
+                    help="SEMPRE 100% de potencia, sem nenhuma freada (curvas, torto, perdido)")
     ap.add_argument("--recalibrar", action="store_true",
                     help="refaz a calibracao da direcao (o carro anda ~1,5 m)")
     ap.add_argument("--vel", type=float, default=None,
                     help="velocidade base desta corrida (0..1), sem mexer no config.py")
     a = ap.parse_args()
+    if a.maximo:
+        config.VELOCIDADE_BASE = config.VELOCIDADE_MIN = config.VELOCIDADE_PERDIDO = 1.0
+        print("MODO MAXIMO: 100% de potencia o tempo todo, sem freada em curva. Mao no Ctrl+C!")
     if a.vel is not None:
         config.VELOCIDADE_BASE = max(config.VELOCIDADE_MIN, min(1.0, a.vel))   # nunca abaixo do piso
         if a.vel < config.VELOCIDADE_MIN:
