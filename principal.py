@@ -129,7 +129,10 @@ def main():
 
     # ---- calibracao da direcao: o carro descobre sozinho pra que lado o volante vira e
     # se puxa pra um lado (1a vez, ou --recalibrar). O resultado fica em dados/direcao.json.
-    dir_cal = calibracao_direcao.carregar()
+    dir_cal = calibracao_direcao.carregar(servo.cal if servo is not None else None)
+    if dir_cal is None and calibracao_direcao.existe() and servo is not None:
+        print("A calibracao da direcao salva (dados/direcao.json) e de OUTRO servo/calibracao de servo: "
+              "vou refazer.")
     if servo is not None and config.AUTOCAL_DIRECAO and (dir_cal is None or a.recalibrar):
         print("\nCALIBRACAO DA DIRECAO (so na 1a vez ou com --recalibrar): o carro vai andar uns "
               "1,5 m e virar um pouco pros dois lados.\nCarro RETO, DENTRO da faixa, num trecho RETO "
@@ -160,8 +163,8 @@ def main():
             servo.virar(0.0)
             time.sleep(0.6)
         if r["ok"]:
-            calibracao_direcao.salvar(r)
-            dir_cal = calibracao_direcao.carregar()
+            calibracao_direcao.salvar(r, servo.cal)
+            dir_cal = calibracao_direcao.carregar(servo.cal)
             print("  calibracao da direcao: " + r["motivo"] + "  [salva em dados/direcao.json]")
         else:
             print("  calibracao da direcao NAO concluida: " + r["motivo"] +

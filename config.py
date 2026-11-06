@@ -45,6 +45,8 @@ SERVO_ESQ_PADRAO      = 60.0
 SERVO_DIR_PADRAO      = 120.0
 SERVO_LIMITE_ABS      = (5.0, 175.0)    # NUNCA manda angulo fora disso
 SERVO_PULSO_US        = (500, 2500)     # largura de pulso em 0 e 180 graus
+SERVO_CURSO_USO_MAX   = 45.0            # em operacao o volante NUNCA passa disso (graus de servo) pra cada lado do
+                                        # centro, mesmo que a calibracao marque mais: evita forcar o batente
 SERVO_CURSO_MAX      = 70.0            # curso (graus) de um lado do centro acima disso = marca suspeita
 SERVO_DEADBAND_DEG    = 0.7             # so reescreve o pulso se mudou mais que isso
 

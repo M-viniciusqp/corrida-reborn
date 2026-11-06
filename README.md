@@ -129,7 +129,7 @@ O simulador usa física simples e câmera ideal: serve para achar erro de lógic
    conhecidos (direita, esquerda). Pela câmera ele mede para que lado o carro girou e descobre:
    - **se o volante está invertido** (e passa a compensar sozinho);
    - **se o carro puxa para um lado** com o volante reto (centro do servo, rodas, motores) e calcula a
-     compensação. Fica em `dados/direcao.json`.
+     compensação. Faz **duas voltas** e confere uma contra a outra (se divergirem, não salva). Fica em `dados/direcao.json` junto com a assinatura do servo: **se você refizer a calibração do servo (ou trocar de servo), ela é refeita sozinha**. O volante nunca passa de `SERVO_CURSO_USO_MAX` (45°) de cada lado do centro.
    Precisa de: carro **reto, dentro da faixa, num trecho reto**, com ~1,5 m livre na frente. Depois ele
    pede para você recolocar o carro no início e apertar Enter.
 2. **Escala** (toda vez, carro parado): mede a largura da faixa (distância *perpendicular* entre as

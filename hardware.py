@@ -177,7 +177,10 @@ class Servo:
         turn = max(-1.0, min(1.0, turn))
         c = self.cal["centro"]
         alvo = self.cal["esquerda"] if turn < 0 else self.cal["direita"]
-        return self.angulo(c + abs(turn) * (alvo - c))
+        curso = alvo - c
+        teto = config.SERVO_CURSO_USO_MAX
+        curso = max(-teto, min(teto, curso))           # nunca forca o servo alem do curso util
+        return self.angulo(c + abs(turn) * curso)
 
     def solto(self):
         """Para de mandar pulso (servo relaxa, nao esquenta/zumbe)."""
