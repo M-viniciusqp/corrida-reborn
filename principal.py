@@ -61,9 +61,10 @@ def main():
         config.VELOCIDADE_BASE = config.VELOCIDADE_MIN = config.VELOCIDADE_PERDIDO = 1.0
         print("MODO MAXIMO: 100% de potencia o tempo todo, sem freada em curva. Mao no Ctrl+C!")
     if a.vel is not None:
-        config.VELOCIDADE_BASE = max(config.VELOCIDADE_MIN, min(1.0, a.vel))   # nunca abaixo do piso
-        if a.vel < config.VELOCIDADE_MIN:
-            print(f"(--vel {a.vel:.2f} esta abaixo do piso {config.VELOCIDADE_MIN:.2f}: usando o piso)")
+        config.VELOCIDADE_BASE = max(config.PISO_MOTOR_MIN, min(1.0, a.vel))   # nunca abaixo do piso do motor
+        config.VELOCIDADE_MIN = min(config.VELOCIDADE_MIN, config.VELOCIDADE_BASE)
+        if a.vel < config.PISO_MOTOR_MIN:
+            print(f"(--vel {a.vel:.2f} esta abaixo do piso {config.PISO_MOTOR_MIN:.2f}: usando o piso)")
         print(f"Velocidade base desta corrida: {config.VELOCIDADE_BASE:.2f}")
 
     ver = a.ver

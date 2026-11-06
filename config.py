@@ -169,8 +169,10 @@ ESTERCO_INVERTER    = False    # o volante deste carro esterca pro lado oposto a
 # 8. VELOCIDADE (0..1)
 # =====================================================================
 VELOCIDADE_BASE     = 1.00    # MAXIMA nas retas (o carro ainda freia antes das curvas)
-VELOCIDADE_MIN      = 0.55    # PISO: nunca manda menos que isso pros motores (pedido: pelo menos 55%)
-VELOCIDADE_PERDIDO  = 0.55    # perdeu a faixa: segue no piso, nao abaixo
+PISO_MOTOR_MIN      = 0.55    # POTENCIA MINIMA aos motores em QUALQUER situacao (pedido: pelo menos 55%);
+                              # e o ponto de partida do que o carro aprende que ele precisa pra andar
+VELOCIDADE_MIN      = 0.85    # piso de CRUZEIRO: nas curvas a freada nao desce disso
+VELOCIDADE_PERDIDO  = 0.55    # perdeu a faixa: anda no piso do motor (nao abaixo) ate parar
 ARRANQUE_VEL        = 0.90    # empurrao ao sair do repouso (vence o atrito)
 ARRANQUE_S          = 0.45    # duracao do empurrao
 
@@ -188,11 +190,11 @@ STALL_FRACO_VEL_MAX = 0.70    # ... e so vale com potencia baixa (a 0.85 o carro
 PISO_PASSO          = 0.05
 PISO_MAX            = 0.95    # teto com prova forte
 PISO_MAX_FRACO      = 0.70    # teto com prova fraca (reta lisa parece parada); so vale com potencia < STALL_FRACO_VEL_MAX
-VEL_REDUCAO_CURVA   = 0.35    # tira ate isso da velocidade com o volante todo
-VEL_REDUCAO_INCERTO = 0.40    # tira ate isso quando a proa/erro estao grandes (carro torto na pista)
+VEL_REDUCAO_CURVA   = 0.12    # tira ate isso da velocidade com o volante todo
+VEL_REDUCAO_INCERTO = 0.15    # tira ate isso quando a proa/erro estao grandes (carro torto na pista)
 INCERTO_PROA_GRAUS  = 25.0    # proa que conta como 'torto' total
 INCERTO_ERRO_CM     = 18.0    # erro lateral que conta como 'longe' total
-VEL_REDUCAO_CURVATURA = 0.50  # tira ate isso ao ver curva fechada la na frente (freia ANTES)
+VEL_REDUCAO_CURVATURA = 0.20  # tira ate isso ao ver curva fechada la na frente (freia ANTES)
 CURVATURA_CHEIA     = 0.010   # curvatura (1/cm) que conta como 'curva fechada' total (raio 100 cm)
 VEL_REDUCAO_CONE    = 0.25    # tira ate isso com cone bem perto
 FPS_MINIMO          = 6.0     # abaixo disso o carro reduz a velocidade

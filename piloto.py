@@ -72,7 +72,7 @@ class Piloto:
             self.cones = []      # corrida pura: cone nem e processado
         # velocidade estimada (sem encoder): do comando anterior, nunca abaixo do
         # minimo (parado/arrancando o ganho do Stanley explodiria)
-        v_cms = max(self.speed, config.VELOCIDADE_MIN) * config.V_CMS_NA_VEL_1
+        v_cms = max(self.speed, config.PISO_MOTOR_MIN) * config.V_CMS_NA_VEL_1
 
         if res.centro is not None:
             if self.perdidos >= config.PERDIDO_QUADROS_DEVAGAR:

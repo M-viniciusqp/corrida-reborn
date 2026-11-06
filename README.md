@@ -148,6 +148,11 @@ invertido e puxando para um lado).
 
 ## Velocidade
 
-Reta: `VELOCIDADE_BASE` (0.85). O carro freia **antes** das curvas (olha a curvatura da faixa lá na
-frente) e reduz quando está torto ou longe do centro, mas nunca abaixo do piso aprendido.
-`python3 principal.py --vel 0.6` testa mais devagar sem editar o config.
+- **Reta:** `VELOCIDADE_BASE = 1.00` (100%).
+- **Curvas:** o carro freia pouco, só até `VELOCIDADE_MIN = 0.85` (piso de cruzeiro). Freios:
+  `VEL_REDUCAO_CURVATURA` (curva à frente), `VEL_REDUCAO_CURVA` (volante virado) e `VEL_REDUCAO_INCERTO`
+  (carro torto/longe do centro). Para frear **ainda menos**: reduza esses três ou suba `VELOCIDADE_MIN`.
+- **Piso do motor:** `PISO_MOTOR_MIN = 0.55`: nunca manda menos que isso (nem ao perder a faixa nem por FPS
+  baixo); o carro ainda aprende sozinho se precisa de mais (`dados/motor.json`).
+- `python3 principal.py --maximo`: 100% o tempo todo, sem nenhuma freada (só nessa corrida).
+- `python3 principal.py --vel 0.6`: velocidade base mais baixa só nessa corrida.

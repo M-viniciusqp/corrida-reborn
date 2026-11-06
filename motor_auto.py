@@ -29,8 +29,8 @@ def pequeno_cinza(frame):
 
 class GovernadorMotor:
     def __init__(self, piso=None, ruido=0.6):
-        # nunca abaixo de VELOCIDADE_MIN, nem se o arquivo salvo tiver um valor menor
-        self.piso = max(float(config.VELOCIDADE_MIN), float(config.VELOCIDADE_MIN if piso is None else piso))
+        # nunca abaixo de PISO_MOTOR_MIN, nem se o arquivo salvo tiver um valor menor
+        self.piso = max(float(config.PISO_MOTOR_MIN), float(config.PISO_MOTOR_MIN if piso is None else piso))
         self.piso_inicial = self.piso
         self.ruido = ruido              # diferenca tipica do quadro PARADO (autocalibracao mede)
         self.mov = None                 # diferenca media (0-255) vs ~0.3 s atras

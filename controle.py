@@ -71,6 +71,7 @@ def velocidade(turn, fator_cone=1.0, fps=30.0, proa_graus=0.0, erro_cm=0.0, curv
     v *= 1.0 - config.VEL_REDUCAO_CURVATURA * min(1.0, abs(curvatura) / config.CURVATURA_CHEIA)
     v *= 1.0 - config.VEL_REDUCAO_INCERTO * min(1.0, incerto)
     v *= max(0.0, min(1.0, fator_cone))
-    if fps < config.FPS_MINIMO:
+    v = max(config.VELOCIDADE_MIN, v)          # piso de CRUZEIRO: so as freadas de curva/torto/cone
+    if fps < config.FPS_MINIMO:                # freio de seguranca por FPS baixo pode ir ate o piso do motor
         v *= max(0.5, fps / config.FPS_MINIMO)
-    return max(config.VELOCIDADE_MIN, v)
+    return max(config.PISO_MOTOR_MIN, v)

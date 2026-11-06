@@ -64,7 +64,7 @@ def calibrar(piloto, passo, log=print):
     passo(turn_raw, speed) -> (frame, t): aplica o comando CRU (sem Stanley, sem inverter,
     sem trim) por um quadro e devolve o proximo quadro e a hora.
     Devolve dict(ok, inverter, trim, K, motivo)."""
-    V = max(config.CAL_DIR_VEL, config.VELOCIDADE_MIN)
+    V = max(config.CAL_DIR_VEL, config.PISO_MOTOR_MIN)
     fases = [("arranque", 0.0, 0.5, False),
              ("direita", +config.CAL_DIR_TURN, 0.6, True),
              ("esquerda", -config.CAL_DIR_TURN, 0.6, True)]
