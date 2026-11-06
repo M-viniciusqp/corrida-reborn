@@ -76,7 +76,10 @@ class GovernadorMotor:
 
         self.parado = False
         if desde >= config.STALL_GRACA_S and janela_ok:
-            cena_parada = self.mov < self.limiar()
+            # mov == 0 exato = quadro IDENTICO ao anterior = camera congelada/repetindo, nao carro parado
+            # (um carro parado ainda tem ruido de sensor). Sem isso o aprendizado subia o piso a toa.
+            congelada = self.mov < 1e-6
+            cena_parada = self.mov < self.limiar() and not congelada
             pose_parada = (abs(erro - e0) < config.STALL_D_ERRO_CM and
                            abs(proa - p0) < config.STALL_D_PROA_GRAUS)
             forte = cena_parada and pose_parada and abs(turn) >= config.STALL_TURN_MIN

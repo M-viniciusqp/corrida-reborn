@@ -85,7 +85,10 @@ def ajustar(frame, res=None):
 
 
 class CameraThread:
-    def __init__(self, cap, repetir_arquivo=True):
+    """Le a camera em segundo plano. Se ela parar de entregar quadros (cabo, falta de energia,
+    USB), FECHA e REABRE sozinha em vez de ficar parada pra sempre."""
+
+    def __init__(self, cap, repetir_arquivo=True, reabrir=None, falhas_max=3, silencio_max_s=2.0):
         self.cap = cap
         self._frame = None
         self._idx = 0
@@ -93,21 +96,56 @@ class CameraThread:
         self._lock = threading.Lock()
         self._rodando = True
         self._repetir = repetir_arquivo
+        self._reabrir = reabrir            # funcao que devolve uma camera nova (ou None = nao reabre)
+        self._falhas_max = falhas_max
+        self._silencio_max = silencio_max_s
+        self.reaberturas = 0
         self._th = threading.Thread(target=self._loop, daemon=True)
         self._th.start()
 
+    def _tentar_reabrir(self):
+        if self._reabrir is None:
+            return False
+        print("AVISO: a camera parou de entregar quadros (energia? USB? outro programa usando?). "
+              "Reabrindo...")
+        try:
+            self.cap.release()
+        except Exception:
+            pass
+        time.sleep(0.6)
+        novo = self._reabrir()
+        if novo is not None and novo.isOpened():
+            self.cap = novo
+            self.reaberturas += 1
+            return True
+        return False
+
     def _loop(self):
+        falhas = 0
+        t_ok = time.time()
         while self._rodando:
             ok, frame = self.cap.read()
             if not ok:
                 if self._repetir and self.cap.get(cv2.CAP_PROP_FRAME_COUNT) > 0:
                     self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                time.sleep(0.01)
+                    time.sleep(0.01)
+                    continue
+                falhas += 1
+                if falhas >= self._falhas_max or (time.time() - t_ok) > self._silencio_max:
+                    if self._tentar_reabrir():
+                        falhas = 0
+                        t_ok = time.time()
+                    else:
+                        time.sleep(1.0)
+                else:
+                    time.sleep(0.02)
                 continue
+            falhas = 0
+            t_ok = time.time()
             with self._lock:
                 self._frame = frame
                 self._idx += 1
-                self._t = time.time()
+                self._t = t_ok
 
     def read(self):
         """(quadro, numero, idade_em_s). quadro None = ainda nao chegou nenhum."""

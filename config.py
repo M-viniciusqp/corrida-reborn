@@ -188,6 +188,7 @@ STALL_D_PROA_GRAUS  = 1.5
 STALL_ACUM_FRACO_S  = 2.0     # prova FRACA (so imagem parada, volante reto) precisa de mais tempo
 STALL_FRACO_VEL_MAX = 0.70    # ... e so vale com potencia baixa (a 0.85 o carro anda de certeza)
 PISO_PASSO          = 0.05
+PISO_SALVAR_MAX     = 0.75    # nunca grava em dados/motor.json um piso acima disso (provavel aprendizado falso)
 PISO_MAX            = 0.95    # teto com prova forte
 PISO_MAX_FRACO      = 0.70    # teto com prova fraca (reta lisa parece parada); so vale com potencia < STALL_FRACO_VEL_MAX
 VEL_REDUCAO_CURVA   = 0.12    # tira ate isso da velocidade com o volante todo

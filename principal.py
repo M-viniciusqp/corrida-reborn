@@ -84,7 +84,17 @@ def main():
     if not cap.isOpened():
         print("Erro: a camera nao abriu (v4l2-ctl --list-devices).")
         return
-    thread = CameraThread(cap)
+    thread = CameraThread(cap, reabrir=lambda: abrir_camera(a.camera))
+    t_espera = time.time()
+    while thread.read()[0] is None and time.time() - t_espera < 6.0:
+        time.sleep(0.05)
+    if thread.read()[0] is None:
+        print("\nERRO: a camera abriu mas NAO entrega quadros. Nao vou andar as cegas.\n"
+              "  1) Outro programa usando a camera?  ->  pkill -f principal.py ; pkill -f calibrar_camera.py\n"
+              "  2) Falta de energia (aviso de baixa tensao)?  ->  vcgencmd get_throttled  (0x0 = ok)\n"
+              "  3) Cabo/porta USB: troque a porta, use uma USB 3 (azul) e um cabo curto.")
+        thread.release()
+        return
 
     if config.AUTOCALIBRAR and not a.sem_autocal:
         print("Autocalibracao (alguns segundos): deixe o carro PARADO, reto, dentro da faixa, "
@@ -174,6 +184,7 @@ def main():
         print(f"Log em {registro.pasta}")
 
     ultimo_idx = -1
+    avisou_velho = False
     t_ini = time.time()
     n, fps_medido = 0, 15.0
     t_fps, frames = time.time(), 0
@@ -188,7 +199,11 @@ def main():
             if idade > config.QUADRO_VELHO_S:
                 if motores:
                     motores.parar()
+                if not avisou_velho:
+                    print(f"  [camera] sem quadro novo ha {idade:.1f}s: motores parados (aguardando a camera)")
+                    avisou_velho = True
                 continue
+            avisou_velho = False
             frame = ajustar(frame)
 
             agora = time.time()
@@ -231,8 +246,12 @@ def main():
             servo.fechar()
         hardware.limpar()
         if piloto.gov.piso > piloto.gov.piso_inicial + 0.005:
-            hardware.salvar_piso(piloto.gov.piso)
-            print(f"Potencia minima aprendida: {piloto.gov.piso:.2f} (salva em dados/motor.json)")
+            salvo = min(piloto.gov.piso, config.PISO_SALVAR_MAX)
+            hardware.salvar_piso(salvo)
+            print(f"Potencia minima aprendida: {piloto.gov.piso:.2f} (salva {salvo:.2f} em dados/motor.json)")
+            if piloto.gov.piso > config.PISO_SALVAR_MAX:
+                print(f"  ATENCAO: o carro quis mais que {config.PISO_SALVAR_MAX:.2f} pra andar: confira a bateria "
+                      f"dos motores, o jumper do ENA/ENB e a camera (imagem congelada engana o aprendizado).")
         thread.release()
         if registro:
             registro.fechar()
