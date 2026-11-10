@@ -87,6 +87,8 @@ def calibrar(piloto, passo, log=print):
     Duas voltas (direita, esquerda); a 2a ja usa a compensacao estimada pela 1a (o carro anda
     mais reto) e as duas medidas de ganho sao CONFERIDAS entre si antes de aceitar.
     Devolve dict(ok, inverter, trim, K, motivo)."""
+    piloto.adapt.desligar()      # os comandos de teste confundiriam o aprendizado andando
+    piloto.protecoes = False     # e o desvio natural do teste nao pode virar 'erro saturado'
     V = max(config.CAL_DIR_VEL, config.PISO_MOTOR_MIN)
     giro = config.CAL_DIR_TURN
     estado = {"sem_faixa": 0}

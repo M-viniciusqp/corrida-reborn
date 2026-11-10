@@ -46,33 +46,29 @@ carro, potência mínima), pista com a contínua dos dois lados e o simulador em
 | IN4 | 16 | 36 | L298N IN4 |
 | GND | — | 6/9/14… | GND da L298N **e** GND do servo/bateria (terra comum) |
 
-Está em `config.py` (seção 1). Servo alimentado pela bateria/BEC (5–6 V), **não** pelo 5 V do Pi.
+Está em `config.py` (seção 1). Servo alimentado pela bateria/BEC (5–6 V), **não** pelo 5 V do Pi. Cuidado com o aviso de baixa tensão: ele derruba câmera e servo.
 
 ## Passo a passo no Raspberry Pi
 
 ```bash
-git pull                      # no Pi, na pasta do repositório
-cd reborn-autonomos
-sudo apt install python3-opencv python3-numpy   # se ainda não tiver
+git pull                      # no Pi, na pasta do repositório (ou git clone na primeira vez)
+sudo apt install python3-opencv python3-numpy python3-gpiozero   # se ainda não tiver
 # opcional (servo sem tremor):  sudo apt install pigpio python3-pigpio && sudo systemctl enable --now pigpiod
+python3 principal.py          # coloque o carro na faixa e rode: ele já larga e se calibra andando
 ```
 
-1. **Fiação dos motores** (carro suspenso, rodas fora do chão):
-   `python3 teste_motores.py`
-2. **Servo — descobrir centro, esquerda e direita:**
-   `python3 teste_servo.py --varrer`
-   Vá com `a`/`d` (±1°) e `A`/`D` (±5°), marque `c` (roda reta), `l` (esquerda total),
-   `r` (direita total), `s` salva em `dados/servo.json`. Pare **antes** da roda bater no batente.
-3. **Câmera — calibrar a geometria do ângulo atual** (no terminal da área de trabalho do Pi):
-   `python3 calibrar_camera.py`
-   Meça com trena a **altura da lente** e a **largura da faixa** e ponha em `config.py`
-   (`CAM_ALTURA_CM`, `FAIXA_LARGURA_CM`...). Depois ajuste ao vivo (`w/s` inclinação, `r/f` altura,
-   `t/g` campo de visão) até as linhas aparecerem **retas e paralelas** na vista de cima e a
-   largura medida bater com a trena. `p` grava `dados/camera.json`.
-4. **Primeiro teste sem mover nada:**
-   `python3 principal.py --seco --ver`
-5. **Andar 10 s:** `python3 principal.py --tempo 10` (o carro para sozinho; `Ctrl+C` também para).
+Só isso. **Não há etapa de calibração antes de largar** (servo: ângulos fixos; câmera: geometria do `config.py`;
+direção, puxão, largura da pista, lado da faixa contínua e luz: aprendidos/relativos andando).
 
+Se quiser conferir antes (opcional):
+1. **Fiação dos motores** (carro suspenso, rodas fora do chão): `python3 teste_motores.py`
+2. **Servo**: `python3 teste_servo.py` (0° → 35° → 65°, como o seu teste)
+3. **Câmera** (no terminal da área de trabalho do Pi): `python3 calibrar_camera.py`. Meça a **altura da lente** e ponha em
+   `CAM_ALTURA_CM`; ajuste ao vivo (`w/s` inclinação, `r/f` altura, `t/g` campo de visão) até as linhas ficarem
+   **retas e paralelas** na vista de cima; `p` grava `dados/camera.json`. (A câmera é a única medida física que importa.)
+4. **Sem mover nada**: `python3 principal.py --seco --ver`
+
+Opções do dia a dia: `--tempo 20` (para sozinho), `--vel 0.7`, `--maximo`, `--esquecer` (aprende do zero), `--ver`.
 Mande a pasta `logs/<data>/` (eventos, telemetria e fotos) quando precisar de ajuda.
 
 ## Como funciona
@@ -121,30 +117,59 @@ python sim.py cone_centro --ver
 O simulador usa física simples e câmera ideal: serve para achar erro de lógica e de sinal
 (esquerda/direita), **não** para afinar números. A validação real é na pista.
 
-## Calibração automática (nada a fazer na pista)
+## Servo: ângulos exatos, sem calibrar
 
-`python3 principal.py` se calibra sozinho:
+Direção usa os ângulos do seu teste (`config.py`): **0° esquerda · 35° reto · 65° direita**, com o mesmo modelo
+de código (`gpiozero.AngularServo`, pino 18, 0–180°, pulso 0,5–2,5 ms). `python3 teste_servo.py` repete o seu
+teste (0 → 35 → 65, 2 s em cada, `Ctrl+C` encerra); `--ajustar` só se um dia precisar mudar. Se a roda virar
+para o lado trocado, não precisa mexer em nada: o carro percebe andando e inverte o volante.
+Instalar o `gpiozero`: `sudo apt install python3-gpiozero` (e `pigpio` opcional, deixa o servo sem tremor).
 
-1. **Direção** (1ª vez, ou `--recalibrar`; `calibracao_direcao.py`): o carro anda ~1,5 m e manda comandos
-   conhecidos (direita, esquerda). Pela câmera ele mede para que lado o carro girou e descobre:
-   - **se o volante está invertido** (e passa a compensar sozinho);
-   - **se o carro puxa para um lado** com o volante reto (centro do servo, rodas, motores) e calcula a
-     compensação. Faz **duas voltas** e confere uma contra a outra (se divergirem, não salva). Fica em `dados/direcao.json` junto com a assinatura do servo: **se você refizer a calibração do servo (ou trocar de servo), ela é refeita sozinha**. O volante nunca passa de `SERVO_CURSO_USO_MAX` (45°) de cada lado do centro.
-   Precisa de: carro **reto, dentro da faixa, num trecho reto**, com ~1,5 m livre na frente. Depois ele
-   pede para você recolocar o carro no início e apertar Enter.
-2. **Escala** (toda vez, carro parado): mede a largura da faixa (distância *perpendicular* entre as
-   linhas) e corrige a altura da câmera para bater com `FAIXA_LARGURA_CM`. Só muda até ±15%.
-   (A busca automática de inclinação existe mas fica **desligada**: no carro real ela se enganou.)
-3. **Potência mínima para andar** (`motor_auto.py`): se mandou andar com o volante virado e o
-   erro/proa não mudam, o carro está parado e ele sobe a potência mínima de 5 em 5% até andar.
-   Fica em `dados/motor.json`.
+## Larga na hora: o carro se calibra ENQUANTO ANDA
 
-Uma vez só (fica salvo em `dados/`, não precisa repetir):
+Como o `gatuno-rapido`, **não existe etapa de calibração antes de largar**: liga o carro e ele já segue a
+faixa. O que o original aprende andando (largura da pista, lado da faixa contínua) ele continua aprendendo, e
+este aprende também o que o original não precisa (`adaptacao.py`):
+
+| O que aprende, andando | Como |
+|---|---|
+| **Sentido do volante** (invertido ou não) | mede o giro do carro pela câmera e compara com o comando; se o erro cresce enquanto o volante tenta reduzi-lo, ou o ganho medido é negativo, **inverte sozinho** |
+| **Puxão do carro** para um lado (centro do servo, rodas, motores) | nas retas, o volante médio que o controle precisa manter vira o `trim` |
+| **Largura da faixa** | distância perpendicular entre as linhas (em `faixas.py`) |
+| **Lado da faixa contínua** | compara a cobertura das linhas (a pontilhada tem buracos); se estiver do outro lado, **espelha a imagem**; depois de concordar por um tempo, **trava** a decisão |
+| **Potência mínima para andar** | se manda andar com o volante virado e a cena não muda, sobe o piso (`motor_auto.py`) |
+
+Até o sentido do volante ser **confirmado** (alguns segundos), ele anda devagar (`LARGADA_VEL_MAX`, o piso do
+motor) e sem o desvio para a pontilhada. Depois, velocidade total. O aprendido fica em `dados/auto.json` e é
+usado já na largada seguinte (`--esquecer` ignora e aprende do zero). Se o servo for recalibrado, a parte de
+direção do arquivo é descartada sozinha.
+
+Opcional (não é necessário): `--autocal` (escala da câmera antes de largar), `--recalibrar` (calibração da
+direção andando uns 2,5 m antes de largar), `calibrar_camera.py` (ajuste manual da câmera).
+
+Uma vez só (fica salvo em `dados/`):
 - inclinação/guinada/rolagem da câmera → `calibrar_camera.py` (`p` grava `dados/camera.json`)
-- centro e limites do servo → `teste_servo.py` (grava `dados/servo.json`)
+- servo: **nada** (ângulos fixos 0°/35°/65° no `config.py`; `teste_servo.py` só para conferir as rodas)
 
-Testar a calibração da direção sem o carro: `python teste_autodirecao.py` (simula carros com volante
-invertido e puxando para um lado).
+Testar sem o carro: `python teste_online.py` (carros simulados com volante invertido, puxando, direção
+fraca/forte, faixa de largura diferente e pista espelhada, **todos largando sem calibrar**).
+
+## Qualquer luminosidade e proteções
+
+A visão **não usa nenhum limite fixo de luz**: o contraste mínimo é medido no próprio quadro (ruído da imagem), o
+brilho da linha é comparado ao brilho das linhas candidatas daquele instante e a saturação é relativa (luz amarela ou
+azulada). `python teste_luz.py` simula escuro, claro, estourado, sombra em degradê, luz amarela/azulada, ruído forte,
+desfoque e reflexo (39 corridas simuladas). A largura da pista é aprendida andando; nada a medir.
+
+| Proteção | Onde |
+|---|---|
+| freio automático quando o FPS cai (`FPS_MINIMO`) | `controle.py` |
+| erro e proa suavizados (`ERRO_SUAV`) e comando de volante filtrado | `piloto.py`, `controle.py` |
+| sem derivada ruidosa: a proa vem de uma janela da faixa (inclinação média), não de diferença quadro a quadro | `piloto.py` |
+| erro **saturado** (colado no máximo por 5 quadros) = rastreio furado: reinicia e conta como faixa perdida | `piloto.py` |
+| **parada total** depois de 12 quadros sem faixa (`PERDIDO_QUADROS_PARAR`) | `piloto.py` |
+| o controle só roda com leitura **fresca** (sem faixa, só decai o volante) | `piloto.py` |
+| câmera parou de entregar quadros: motores param e ela reabre sozinha | `camera.py`, `principal.py` |
 
 ## Velocidade
 

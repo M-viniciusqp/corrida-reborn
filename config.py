@@ -40,11 +40,15 @@ MOTOR_B_INVERTIDO = False   # (em vez de trocar fios)
 #    Os 3 numeros sao independentes: nao importa se esquerda < centro < direita
 #    ou o contrario (servo montado invertido).
 # =====================================================================
-SERVO_CENTRO_PADRAO   = 90.0
-SERVO_ESQ_PADRAO      = 60.0
-SERVO_DIR_PADRAO      = 120.0
-SERVO_LIMITE_ABS      = (5.0, 175.0)    # NUNCA manda angulo fora disso
-SERVO_PULSO_US        = (500, 2500)     # largura de pulso em 0 e 180 graus
+# ANGULOS EXATOS deste carro (os do teste que voce ja usa): 0 = esquerda total, 35 = reto, 65 = direita
+# total. Nao precisa calibrar. Mesmo modelo do seu codigo: gpiozero.AngularServo(pino 18, 0..180 graus,
+# pulso de 0.5 a 2.5 ms).
+SERVO_ESQ_PADRAO      = 0.0
+SERVO_CENTRO_PADRAO   = 35.0
+SERVO_DIR_PADRAO      = 65.0
+SERVO_USAR_ARQUIVO    = False           # True = usa dados/servo.json (teste_servo.py --ajustar) em vez dos angulos acima
+SERVO_LIMITE_ABS      = (0.0, 180.0)    # NUNCA manda angulo fora disso
+SERVO_PULSO_US        = (500, 2500)     # largura de pulso em 0 e 180 graus (0.0005 e 0.0025 s)
 SERVO_CURSO_USO_MAX   = 45.0            # em operacao o volante NUNCA passa disso (graus de servo) pra cada lado do
                                         # centro, mesmo que a calibracao marque mais: evita forcar o batente
 SERVO_CURSO_MAX      = 70.0            # curso (graus) de um lado do centro acima disso = marca suspeita
@@ -85,8 +89,8 @@ BEV_PX_POR_CM  = 3.0        # resolucao da vista de cima
 
 # Ao ligar, com o carro parado na faixa, mede a largura da faixa e corrige a
 # ESCALA (altura da camera) sozinho. Nao corrige inclinacao/guinada/rolagem.
-AUTOCALIBRAR = True
-AUTOCAL_DIRECAO = True        # 1a vez: o carro anda ~1.5 m e descobre sozinho pra que lado o volante vira
+AUTOCALIBRAR = False          # ANTES de largar (escala da camera, parado). Desligado: o carro larga na hora.
+AUTOCAL_DIRECAO = False       # 1a vez: o carro anda ~1.5 m e descobre sozinho pra que lado o volante vira
                               # e se puxa pra um lado (grava dados/direcao.json; --recalibrar refaz)
 CAL_DIR_VEL = 0.65            # potencia durante a calibracao da direcao
 CAL_DIR_TURN = 0.3            # comando de volante usado nos testes (+-)
@@ -122,10 +126,13 @@ VIES_PONTILHADA_FRAC = 0.50
 # Realce de linha por "diferenca de gaussianas" (centro - entorno) em vez de
 # limiar simples: ignora variacao lenta de luz e acha tiras claras estreitas.
 # =====================================================================
-DOG_MIN             = 14      # contraste minimo (0-255) pra ser linha
+DOG_ABS_MIN         = 4.0     # piso ABSOLUTO do contraste (so evita enxergar linha onde nao ha sinal)
+DOG_SIGMAS          = 5.0     # contraste minimo = isto x o ruido medido NA PROPRIA imagem
 DOG_PERCENTIL       = 99.0    # o limiar sobe se a cena inteira estiver brilhante
 DOG_FATOR           = 0.40
-BRILHO_MIN          = 90      # a linha tem que ser mais clara que isso (0-255)
+BRILHO_MIN          = 20      # piso ABSOLUTO de brilho (0-255); o limite de verdade e relativo (abaixo)
+BRILHO_REL          = 0.55    # a linha tem que ter pelo menos isto do brilho tipico das linhas candidatas
+SAT_FOLGA           = 45      # saturacao maxima = a das linhas candidatas + isto (luz amarela/azulada)
 SAT_MAX             = 110     # branco tem pouca saturacao (tira cones/ladrilho colorido)
 
 # busca por janelas deslizantes na BEV
@@ -140,6 +147,7 @@ CURVA_GRAU2_EXTENSAO = 0.6    # so ajusta parabola se a linha cobrir isso da BEV
 LINHA_CURTA_FRAC     = 0.40   # linha com menos que isso da faixa visivel = 'curta' (so posicao, herda inclinacao)
 
 # continua x pontilhada: fracao dos trechos (janelas) que tem tinta
+COBERTURA_TINTA_MIN     = 0.50    # fracao da tinta esperada num trecho pra ele contar como 'com tinta'
 COBERTURA_CONTINUA_MIN  = 0.80
 COBERTURA_PONTILHADA_MAX = 0.72
 COBERTURA_SUAVIZACAO    = 0.6     # EMA da cobertura entre quadros (1 = so o quadro atual)
@@ -200,12 +208,12 @@ INCERTO_ERRO_CM     = 18.0    # erro lateral que conta como 'longe' total
 VEL_REDUCAO_CURVATURA = 0.20  # tira ate isso ao ver curva fechada la na frente (freia ANTES)
 CURVATURA_CHEIA     = 0.010   # curvatura (1/cm) que conta como 'curva fechada' total (raio 100 cm)
 VEL_REDUCAO_CONE    = 0.25    # tira ate isso com cone bem perto
-FPS_MINIMO          = 6.0     # abaixo disso o carro reduz a velocidade
+FPS_MINIMO          = 12.0    # abaixo disso o carro reduz a velocidade (freio automatico por FPS baixo)
 QUADRO_VELHO_S      = 0.5     # quadro mais velho que isso = para
 
 # perdeu as faixas
-PERDIDO_QUADROS_DEVAGAR = 10  # anda devagar segurando o volante
-PERDIDO_QUADROS_PARAR   = 20    # ~0.8 s sem faixa a 25 FPS -> para (a 100% 2 s as cegas e muito)
+PERDIDO_QUADROS_DEVAGAR = 6   # anda devagar segurando o volante
+PERDIDO_QUADROS_PARAR   = 12    # PARADA TOTAL depois de 12 quadros sem faixa (~0.5 s a 25 FPS)
 
 # =====================================================================
 # 9. CONES
@@ -250,3 +258,53 @@ CONE_FRENAGEM_ALCANCE_CM = 60.0
 # =====================================================================
 DEBUG_CADA = 2            # --ver: desenha a cada N quadros
 LOG_PASTA = "logs"
+
+
+# =====================================================================
+# 12. ADAPTACAO ANDANDO (adaptacao.py): o carro larga na hora e se calibra em movimento
+# =====================================================================
+ADAPTACAO = True
+CARRO_ENTREEIXOS_CM = 20.0    # distancia entre eixos (so da a escala do ganho nominal da direcao)
+ADAPT_TAU_S = 2.0             # memoria da regressao (esquecimento)
+ADAPT_JANELA_S = 0.35         # janela curta pra medir o giro (inclinacao da proa)
+ADAPT_ATRASO_S = 0.12         # o carro demora isso pra responder ao volante
+ADAPT_DIV_U_MIN = 0.2         # detector rapido de volante invertido: comando minimo
+ADAPT_DIV_TAXA_CMS = 5.0       # ... erro crescendo mais que isso (cm/s)
+ADAPT_DIV_PERSISTE_S = 0.25   # ... por esse tempo
+ADAPT_DIV_JANELA_S = 1.8      # gatilho simples so nos primeiros segundos (depois de largar ou de inverter)
+ADAPT_DIV_ACEL = 1.35         # a taxa de crescimento do erro tem que ter SUBIDO assim vs ~0.3 s atras (acelera)
+ADAPT_DIV_ERRO_MIN = 2.5      # ... e o erro ja passar de tantos cm
+ADAPT_DIV_VETO_K = 5.0         # ganho pela origem acima disso (graus/s por unidade) = o volante responde normal
+ADAPT_DIV_VETO_RMS2 = 0.01    # ... estimado com comandos de rms >= ~0.1
+ADAPT_DIV_VETO = True         # veto: ganho "pela origem" ja positivo = e so correcao fraca (puxao, curva)
+                              # enviesada na malha fechada e bloqueava a inversao necessaria
+ADAPT_N_MIN = 7.0             # amostras efetivas minimas pra decidir algo
+ADAPT_RMS2_MIN = 0.03         # media do quadrado do comando minima pra estimar o sentido (rms ~0.17)
+ADAPT_K_FLIP = 20.0           # ganho medido abaixo de -isso (persistente) = volante invertido
+ADAPT_K_OK = 25.0             # ganho medido acima de isso (persistente) = sentido confirmado
+ADAPT_PERSISTE_S = 0.4
+ADAPT_AJUSTE_S = 0.5          # de quanto em quanto tempo ajusta ganho/trim
+ADAPT_GANHO_MIN = 0.6
+ADAPT_GANHO_MAX = 2.5
+ADAPT_TRIM_PASSO = 0.25       # fracao do volante medio da reta transferida pro trim a cada ajuste
+ADAPT_TRIM_TAU_S = 3.0        # memoria da media do volante nas retas
+ADAPT_TRIM_MIN_RETA_S = 1.5   # tempo minimo de reta acumulado antes de mexer no trim
+ADAPT_RETA_CURV = 0.0015      # curvatura (1/cm) abaixo da qual conta como reta
+ADAPT_RETA_PROA = 8.0         # proa (graus) abaixo da qual conta como reta
+ADAPT_GANHO_ATIVO = False     # ajustar a forca da direcao: DESLIGADO (a estimativa e enviesada e o
+                              # controle ja tolera 2x de erro na forca da direcao)
+LARGADA_OLHAR_S = 0.30        # ao largar com o lado da continua incerto: anda RETO por este tempo antes de manobrar
+LARGADA_OLHAR_ERRO_CM = 5.0   # ... so se o carro largou calmo (erro menor que isso)
+LARGADA_OLHAR_PROA = 5.0      # ... e proa menor que isso (graus)
+LARGADA_VEL_MAX = 0.55        # ate o sentido do volante ser confirmado (ou lido do arquivo): devagar (o piso do motor)
+LADO_MARGEM = 0.15            # diferenca de cobertura (continua x pontilhada) que conta como evidencia
+LADO_TAU_S = 0.10             # suavizacao (em TEMPO) da evidencia de lado
+LADO_TROCA_S = 0.30           # evidencia contraria por este tempo = espelha
+LADO_TRAVA_S = 3.0            # evidencia a favor por este tempo = trava a decisao
+
+# =====================================================================
+# 13. PROTECOES (mesmas ideias do gatuno-rapido)
+# =====================================================================
+ERRO_SUAV = 0.70              # erro/proa suavizados: peso da leitura nova (menor = mais suave)
+SAT_ERRO_FRAC = 0.90          # erro >= isto x largura da faixa = "colado no maximo"
+MAX_FRAMES_SATURADO = 5       # ... por tantos quadros seguidos = rastreio furado: reinicia e conta como perdida

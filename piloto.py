@@ -25,6 +25,7 @@ from cones import DetectorCones, RastreadorCones
 from planejador import Planejador
 from controle import Direcao, velocidade
 from motor_auto import GovernadorMotor, pequeno_cinza
+from adaptacao import Adaptacao
 
 
 class Piloto:
@@ -43,6 +44,7 @@ class Piloto:
         self.erro_cm = 0.0
         self.proa_graus = 0.0
         self.curvatura = 0.0       # 1/cm, da faixa a frente (pra frear antes da curva)
+        self.curvatura_sinal = 0.0 # idem COM SINAL (+ = faixa dobrando pra direita): descontar o giro da pista
         self.perdidos = 0
         self.motivo = "ok"
         self.eventos = []
@@ -52,6 +54,21 @@ class Piloto:
         self.espelhar = False      # continua a ESQUERDA: espelha a imagem (o resto assume continua a direita)
         self.frame_proc = None     # quadro realmente processado (espelhado ou nao), pro HUD
         self.deslocamento_cm = 0.0 # alvo lateral aplicado (vies da pontilhada + desvio), pro HUD
+        self.protecoes = True      # False so na calibracao antiga (comandos de teste desviam o carro de proposito)
+        self._sat = 0              # quadros seguidos com o erro colado no maximo (rastreio furado)
+        self._erro_f = None        # erro e proa SUAVIZADOS (o Stanley usa estes)
+        self._proa_f = None
+        self._t_ok0 = None         # instante da primeira leitura boa da faixa
+        self._n_ok = 0             # quadros com faixa lida desde a largada (olha antes de manobrar)
+        self.adapt = Adaptacao(self)   # calibracao ANDANDO: sentido do volante, puxao, ganho, lado da continua
+
+    def _alternar_espelho(self):
+        """A faixa continua esta do outro lado: espelha e recomeca o rastreio do centro."""
+        self.espelhar = not self.espelhar
+        f = self.faixas
+        f.c_prev, f._tem_prev, f._tracks, f._evid, f._sem_centro = 0.0, True, [], 0.0, 4
+        self.direcao.reset()
+        self.adapt._zerar()
 
     # ------------------------------------------------------------------
     def step(self, t, frame, fps=30.0, debug=False):
@@ -74,6 +91,22 @@ class Piloto:
         # minimo (parado/arrancando o ganho do Stanley explodiria)
         v_cms = max(self.speed, config.PISO_MOTOR_MIN) * config.V_CMS_NA_VEL_1
 
+        # ---- ERRO SATURADO: erro colado no maximo por varios quadros nao e curva, e rastreio furado
+        # (a faixa trocou de lado, linha errada): em vez de virar o volante com confianca total, admite
+        # que se perdeu, zera o rastreio e segue o caminho de 'faixa perdida'
+        if res.centro is not None and self.protecoes:
+            if abs(float(res.centro.x(0.0))) >= config.SAT_ERRO_FRAC * self.faixas.W:
+                self._sat += 1
+            else:
+                self._sat = 0
+            if self._sat > config.MAX_FRAMES_SATURADO:
+                self._sat = 0
+                self.faixas.reiniciar()
+                res.centro = None
+                res.motivo = "erro saturado"
+        else:
+            self._sat = 0
+
         if res.centro is not None:
             if self.perdidos >= config.PERDIDO_QUADROS_DEVAGAR:
                 self.eventos.append("[pista] faixa reencontrada")
@@ -83,7 +116,9 @@ class Piloto:
             centro = res.centro
             o = self.plan.atualizar(dt, self.cones, centro, v_cms)
             # linha de corrida: mais perto da pontilhada (sempre a ESQUERDA no mundo ja espelhado)
-            vies = -min(0.9, max(0.0, config.VIES_PONTILHADA_FRAC)) * 0.5 * config.FAIXA_LARGURA_CM
+            vies = -min(0.9, max(0.0, config.VIES_PONTILHADA_FRAC)) * 0.5 * self.faixas.W
+            if config.ADAPTACAO and not self.adapt.direcao_ok:
+                vies = 0.0            # ate confirmar o sentido do volante: sem manobra, so segue o centro
             o += vies
             self.deslocamento_cm = o
             self.eventos.extend(self.plan.eventos)
@@ -107,15 +142,44 @@ class Piloto:
             if y_far - y_v > 20.0:
                 s1 = (float(centro.x(y_mid)) - float(centro.x(y_v))) / (y_mid - y_v)
                 s2 = (float(centro.x(y_far)) - float(centro.x(y_mid))) / (y_far - y_mid)
-                k = abs(s2 - s1) / (0.5 * (y_far - y_v))
-                self.curvatura = 0.5 * self.curvatura + 0.5 * k
+                ks = (s2 - s1) / (0.5 * (y_far - y_v))
+                self.curvatura = 0.5 * self.curvatura + 0.5 * abs(ks)
+                self.curvatura_sinal = 0.5 * self.curvatura_sinal + 0.5 * ks
 
-            turn = self.direcao.atualizar(dt, erro, proa, v_cms)
+            # erro e proa SUAVIZADOS (media movel exponencial): tira o tremido de uma leitura isolada
+            if self._erro_f is None:
+                self._erro_f, self._proa_f = erro, proa
+            else:
+                a_s = config.ERRO_SUAV
+                self._erro_f = a_s * erro + (1.0 - a_s) * self._erro_f
+                self._proa_f = a_s * proa + (1.0 - a_s) * self._proa_f
+            turn = self.direcao.atualizar(dt, self._erro_f, self._proa_f, v_cms)
+            self._n_ok += 1
+            if self._t_ok0 is None:
+                self._t_ok0 = t
+            if (config.ADAPTACAO and not self.adapt.lado_travado
+                    and (t - self._t_ok0) <= config.LARGADA_OLHAR_S
+                    and abs(self.erro_cm) < config.LARGADA_OLHAR_ERRO_CM
+                    and abs(self.proa_graus) < config.LARGADA_OLHAR_PROA):
+                # lado da faixa continua ainda incerto: nos primeiros quadros anda RETO (so o puxao
+                # conhecido), pra a evidencia de lado chegar antes de qualquer manobra
+                self.direcao.turn = 0.0
+                turn = self.direcao.saida()
             speed = velocidade(turn, self.plan.fator_vel, fps, self.proa_graus, self.erro_cm,
                                self.curvatura)
+
+            # ---- calibracao ANDANDO (nada de esperar antes de largar)
+            self.adapt.atualizar(t, dt, self.proa_graus, self.curvatura_sinal, self.speed, self.gov.parado, self.erro_cm)
+            if self.adapt.lado(res.linhas, self.faixas._y_ref(), dt):
+                self._alternar_espelho()
+            self.eventos.extend(self.adapt.eventos)
+            if self.adapt.virou_agora:
+                turn = self.direcao.saida()        # volante invertido agora: a saida deste mesmo quadro ja sai certa
         else:
             self.perdidos += 1
             self.motivo = res.motivo
+            self._erro_f = self._proa_f = None      # leitura nova depois do buraco: sem misturar com a velha
+            self.adapt.sem_leitura()
             self.plan.atualizar(dt, [], None, v_cms)
             if self.perdidos == 1:
                 self.eventos.append(f"[pista] perdi a faixa ({res.motivo})")
@@ -129,10 +193,18 @@ class Piloto:
                 turn = self.direcao.decair(0.97)
                 speed = config.VELOCIDADE_PERDIDO
 
+        # ate confirmar o sentido do volante: devagar. O limite vale ANTES do governador (ele precisa
+        # saber a potencia que de fato esta sendo pedida pra julgar se o carro anda) e DEPOIS (o empurrao
+        # de largada tambem respeita).
+        limitada = config.ADAPTACAO and not self.adapt.direcao_ok
+        if limitada and speed > 0.05:
+            speed = min(speed, max(config.LARGADA_VEL_MAX, self.gov.piso))
         # governador do motor: piso aprendido (carro parado -> sobe a potencia) e empurrao
         speed = self.gov.atualizar(t, dt, pequeno_cinza(frame), speed, turn,
                                    self.erro_cm, self.proa_graus)
         self.eventos.extend(self.gov.eventos)
+        if limitada and speed > 0.05:
+            speed = min(speed, max(config.LARGADA_VEL_MAX, self.gov.piso))
 
         self.turn, self.speed = turn, speed
         return turn, speed

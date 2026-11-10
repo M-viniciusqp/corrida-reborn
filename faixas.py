@@ -117,6 +117,11 @@ class DetectorFaixas:
         self.c_prev = 0.0           # ultimo centro conhecido (X no Y de referencia)
         self._tem_prev = True
         self._evid = 0.0            # evidencia acumulada a favor de OUTRA faixa
+        # LARGURA DA FAIXA aprendida andando (o original aprendia a meia-largura em pixels):
+        # comeca no valor do config e converge pro que as linhas realmente mostram.
+        self.W0 = float(config.FAIXA_LARGURA_CM)
+        self.W = self.W0
+        self.W_amostras = 0
         self._slope = 0.0           # inclinacao do centro no quadro anterior (herdada por linhas curtas)
         self._religou = False
         self._sem_centro = 0
@@ -155,6 +160,7 @@ class DetectorFaixas:
         self._medir_cobertura(linhas, mascara)
         self._classificar(linhas)
         self._identificar(linhas)
+        self._aprender_largura(linhas)
         res.linhas = linhas
 
         centro = self._fundir(linhas)
@@ -172,6 +178,11 @@ class DetectorFaixas:
         res.centro = centro
         res.c_ref = c_ref
         return res
+
+    def reiniciar(self):
+        """Rastreio furado (erro saturado): esquece o historico de posicao, com a 'porta' de continuidade
+        aberta pra achar a faixa certa no proximo quadro."""
+        self.c_prev, self._tem_prev, self._tracks, self._evid, self._sem_centro = 0.0, True, [], 0.0, 4
 
     def _perdeu(self, res):
         # muito tempo sem centro: esquece o historico (o carro pode estar em outro lugar)
@@ -198,15 +209,27 @@ class DetectorFaixas:
         valido = cam.mascara_bev
         vals = dog[valido]
         p = float(np.percentile(vals, config.DOG_PERCENTIL)) if vals.size else 0.0
-        limiar = max(float(config.DOG_MIN), config.DOG_FATOR * p)
+        # Limiar RELATIVO ao quadro (vale com qualquer luz): sobe com o ruido que a PROPRIA imagem tem
+        # (desvio robusto da diferenca de gaussianas) e com a forca das linhas dela; o piso absoluto so
+        # impede de enxergar linha em imagem sem sinal nenhum.
+        sigma = 1.4826 * float(np.median(np.abs(vals - np.median(vals)))) if vals.size else 0.0
+        limiar = max(float(config.DOG_ABS_MIN), config.DOG_SIGMAS * sigma, config.DOG_FATOR * p)
 
         h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
         laranja = (((h <= config.CONE_H_BAIXO) | (h >= config.CONE_H_ALTO)) &
                    (s >= config.CONE_S_MIN) & (v >= config.CONE_V_MIN)).astype(np.uint8)
         laranja = cv2.dilate(laranja, np.ones((7, 7), np.uint8)) > 0
 
-        m = ((dog > limiar) & (gray > config.BRILHO_MIN) & (s < config.SAT_MAX)
-             & ~laranja & valido)
+        cand = (dog > limiar) & ~laranja & valido
+        brilho_min, sat_max = float(config.BRILHO_MIN), float(config.SAT_MAX)
+        if int(cand.sum()) >= 30:
+            # brilho e saturacao TIPICOS das linhas candidatas deste quadro: a linha tem que ser clara em
+            # relacao a elas (nao a um numero fixo): escuro, claro, luz amarela... o criterio acompanha
+            g_ref = float(np.percentile(gray[cand], 70))
+            s_ref = float(np.median(s[cand]))
+            brilho_min = max(float(config.BRILHO_MIN), config.BRILHO_REL * g_ref)
+            sat_max = max(float(config.SAT_MAX), s_ref + config.SAT_FOLGA)
+        m = (cand & (gray >= brilho_min) & (s < sat_max))
         m = m.astype(np.uint8)
         m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
         return m
@@ -319,7 +342,7 @@ class DetectorFaixas:
             perto = np.abs(X - l.x(Y)) < tol
             seg = np.clip(((Y[perto] - cam.y_min) / alt_seg).astype(int), 0, K - 1)
             cont = np.bincount(seg, minlength=K)
-            com_tinta = cont >= 0.25 * area_esp
+            com_tinta = cont >= config.COBERTURA_TINTA_MIN * area_esp
             l.cobertura = float((com_tinta & ok).sum() / ok.sum())
 
     def _classificar(self, linhas):
@@ -363,7 +386,7 @@ class DetectorFaixas:
         hipoteses perto dele (o carro nao pula uma faixa de um quadro pro outro).
         Se a melhor hipotese LIVRE discordar por varios quadros seguidos, ai sim
         o carro 'religa' nela (o rotulo antigo estava errado)."""
-        W = config.FAIXA_LARGURA_CM
+        W = self.W
         desloc = {"B": +1.5 * W, "D": +0.5 * W, "A": -0.5 * W}   # centro da faixa A = x + desloc
         esperada_classe = {"B": "continua", "D": "pontilhada", "A": "continua"}
         c_prev = self.c_prev if self._tem_prev else 0.0
@@ -424,11 +447,27 @@ class DetectorFaixas:
         for l in linhas:
             l.ident = escolhida[2].get(id(l)) if escolhida else None
 
+    def _aprender_largura(self, linhas):
+        """Distancia PERPENDICULAR entre linhas vizinhas bem medidas (D-A, B-D) -> media movel."""
+        cam = self.cam
+        span = cam.y_max - cam.y_min
+        por = {l.ident: l for l in linhas
+               if l.ident and (l.y1 - l.y0) >= 0.4 * span}
+        y = self._y_ref()
+        for a, b in (("D", "A"), ("B", "D")):
+            if a in por and b in por:
+                s = espacamento_perp(por[a], por[b], y)
+                if 0.6 * self.W0 <= s <= 1.6 * self.W0:
+                    # primeiras amostras pesam mais (converge rapido); depois fica estavel
+                    k = max(0.02, 1.0 / (self.W_amostras + 1))
+                    self.W = float(np.clip(self.W + k * (s - self.W), 0.7 * self.W0, 1.5 * self.W0))
+                    self.W_amostras += 1
+
     # ------------------------------------------------------------------
     def _fundir(self, linhas):
         """Cada linha identificada da uma estimativa do centro da faixa A."""
         cam = self.cam
-        W = config.FAIXA_LARGURA_CM
+        W = self.W
         desloc = {"B": +1.5 * W, "D": +0.5 * W, "A": -0.5 * W}
         uteis = [l for l in linhas if l.ident is not None]
         if not uteis:

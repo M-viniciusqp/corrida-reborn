@@ -20,23 +20,30 @@ import config
 
 
 class Direcao:
+    """Stanley. O ESTADO (self.turn) fica no mundo LOGICO: + = virar pra direita no mundo ja
+    espelhado em que o piloto enxerga. O sinal fisico (volante invertido, imagem espelhada) e o
+    puxao do carro (trim) entram so na SAIDA, pra que a adaptacao online consiga medir o efeito
+    do comando no giro do carro sem confundir com eles."""
+
     def __init__(self):
-        self.turn = 0.0
+        self.turn = 0.0                           # estado logico (-1..1)
         self.delta_graus = 0.0
-        self.termos = (0.0, 0.0)       # (proa, lateral) em graus, so pra log
-        # Descobertos pela calibracao da direcao (calibracao_direcao.py): o config.py e so o padrao.
+        self.termos = (0.0, 0.0)                  # (proa, lateral) em graus, so pra log
+        # Aprendidos ANDANDO (adaptacao.py) ou lidos de dados/auto.json; o config.py e so o padrao.
         self.inverter = config.ESTERCO_INVERTER   # o volante vira pro lado oposto ao comandado
-        self.trim = 0.0                           # comando que faz o carro andar RETO (-1..1, ja no
-                                                  # dominio do que vai pro servo)
-        self.espelho = False                      # imagem espelhada (continua a esquerda): o erro vem
-                                                  # com o sinal trocado
+        self.trim = 0.0                           # comando fisico que faz o carro andar RETO (-1..1)
+        self.ganho = 1.0                          # multiplica o esterco (carro de direcao fraca/forte)
+        self.espelho = False                      # imagem espelhada (continua a esquerda)
 
     def reset(self):
         self.turn = 0.0
 
+    def sinal(self):
+        return -1.0 if (self.inverter != self.espelho) else 1.0
+
     def saida(self):
-        """Comando final pro servo: estado + trim (carro que puxa pra um lado)."""
-        return max(-1.0, min(1.0, self.turn + self.trim))
+        """Comando FISICO pro servo: sinal * estado + trim."""
+        return max(-1.0, min(1.0, self.sinal() * self.turn + self.trim))
 
     def atualizar(self, dt, erro_cm, proa_rad, v_cms):
         if abs(erro_cm) < config.ERRO_ZONA_MORTA_CM:
@@ -46,9 +53,7 @@ class Direcao:
         delta = t_proa + t_lat
         self.delta_graus = math.degrees(delta)
         self.termos = (math.degrees(t_proa), math.degrees(t_lat))
-        alvo = max(-1.0, min(1.0, self.delta_graus / config.ESTERCO_MAX_GRAUS))
-        if self.inverter != self.espelho:      # volante invertido XOR imagem espelhada
-            alvo = -alvo
+        alvo = max(-1.0, min(1.0, self.ganho * self.delta_graus / config.ESTERCO_MAX_GRAUS))
         a = config.ESTERCO_SUAVIZACAO
         novo = a * alvo + (1 - a) * self.turn
         passo = config.ESTERCO_SLEW * dt

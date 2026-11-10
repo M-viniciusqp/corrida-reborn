@@ -29,6 +29,7 @@ import time
 
 import cv2
 
+import adaptacao
 import calibracao_direcao
 import config
 import hardware
@@ -54,6 +55,10 @@ def main():
                     help="SEMPRE 100% de potencia, sem nenhuma freada (curvas, torto, perdido)")
     ap.add_argument("--recalibrar", action="store_true",
                     help="refaz a calibracao da direcao (o carro anda ~1,5 m)")
+    ap.add_argument("--autocal", action="store_true",
+                    help="faz a autocalibracao da escala ANTES de largar (padrao: larga na hora)")
+    ap.add_argument("--esquecer", action="store_true",
+                    help="ignora o que foi aprendido antes (dados/auto.json) e aprende do zero")
     ap.add_argument("--vel", type=float, default=None,
                     help="velocidade base desta corrida (0..1), sem mexer no config.py")
     a = ap.parse_args()
@@ -96,7 +101,7 @@ def main():
         thread.release()
         return
 
-    if config.AUTOCALIBRAR and not a.sem_autocal:
+    if (config.AUTOCALIBRAR or a.autocal) and not a.sem_autocal:
         print("Autocalibracao (alguns segundos): deixe o carro PARADO, reto, dentro da faixa, "
               "com a pontilhada e a continua visiveis...")
 
@@ -133,7 +138,7 @@ def main():
     if dir_cal is None and calibracao_direcao.existe() and servo is not None:
         print("A calibracao da direcao salva (dados/direcao.json) e de OUTRO servo/calibracao de servo: "
               "vou refazer.")
-    if servo is not None and config.AUTOCAL_DIRECAO and (dir_cal is None or a.recalibrar):
+    if servo is not None and (a.recalibrar or (config.AUTOCAL_DIRECAO and dir_cal is None)):
         print("\nCALIBRACAO DA DIRECAO (so na 1a vez ou com --recalibrar): o carro vai andar uns "
               "1,5 m e virar um pouco pros dois lados.\nCarro RETO, DENTRO da faixa, num trecho RETO "
               "da pista, com espaco livre na frente. SAIA DA FRENTE!")
@@ -180,7 +185,16 @@ def main():
         print(f"Direcao: volante {'INVERTIDO' if dir_cal['inverter'] else 'normal'}, "
               f"compensacao {dir_cal['trim']:+.2f} (dados/direcao.json)")
     else:
-        print(f"Direcao: padrao do config.py (inverter={config.ESTERCO_INVERTER})")
+        print(f"Direcao: padrao do config.py (inverter={config.ESTERCO_INVERTER}); o carro se ajusta ANDANDO")
+
+    # ---- o que foi aprendido ANDANDO nas corridas anteriores (sentido do volante, puxao, largura, lado)
+    auto = None if a.esquecer else adaptacao.carregar_auto(servo.cal if servo is not None else None)
+    if auto:
+        piloto.adapt.aplicar(auto)
+        print(f"Aprendido antes (dados/auto.json): volante {'INVERTIDO' if piloto.direcao.inverter else 'normal'}"
+              f"{' (confirmado)' if piloto.adapt.confirmada else ' (a confirmar)'}, compensacao "
+              f"{piloto.direcao.trim:+.2f}, faixa {piloto.faixas.W:.1f} cm")
+    print("LARGA NA HORA: o carro se calibra enquanto anda (devagar ate confirmar o sentido do volante).")
 
     registro = None if a.sem_log else Registro()
     if registro:
@@ -255,6 +269,10 @@ def main():
             if piloto.gov.piso > config.PISO_SALVAR_MAX:
                 print(f"  ATENCAO: o carro quis mais que {config.PISO_SALVAR_MAX:.2f} pra andar: confira a bateria "
                       f"dos motores, o jumper do ENA/ENB e a camera (imagem congelada engana o aprendizado).")
+        try:
+            adaptacao.salvar_auto(piloto.adapt.estado(), servo.cal if servo is not None else None)
+        except Exception as e:
+            print(f"(nao consegui salvar o aprendizado: {e})")
         thread.release()
         if registro:
             registro.fechar()
@@ -270,10 +288,12 @@ def _resumo(p, fps):
     linhas = ""
     if r is not None and r.linhas:
         linhas = " ".join(f"{l.ident or '?'}:{l.x_ref:+.0f}" for l in r.linhas)
-    cones = " ".join(f"#{c.id}({c.x:+.0f},{c.y:.0f})" for c in p.cones) or "-"
+    d = p.direcao
+    auto = (f"volante {'INV' if d.inverter != d.espelho else 'normal'}{'+' if p.adapt.confirmada else '?'} "
+            f"trim {d.trim:+.2f} W {p.faixas.W:.0f}cm{' ESPELHADO' if p.espelhar else ''}")
     print(f"FPS {fps:4.1f} | {'OK' if p.motivo == 'ok' else 'PERDIDO: ' + p.motivo:<24s} | "
           f"erro {p.erro_cm:+6.1f}cm proa {p.proa_graus:+5.1f} | turn {p.turn:+.2f} vel {p.speed:.2f} "
-          f"| desvio {p.plan.o_cmd:+5.1f}cm [{p.plan.estado}] | linhas {linhas or '-'} | cones {cones}")
+          f"| auto: {auto} | linhas {linhas or '-'}")
 
 
 if __name__ == "__main__":

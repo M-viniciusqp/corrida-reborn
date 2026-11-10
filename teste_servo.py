@@ -1,37 +1,23 @@
 """
-teste_servo.py - descobre o CENTRO, o limite ESQUERDO e o limite DIREITO do servo.
+teste_servo.py - o servo nos ANGULOS EXATOS do carro (sem calibrar).
 
-    python3 teste_servo.py              # modo manual (teclas)
-    python3 teste_servo.py --varrer     # primeiro faz uma varredura lenta pra voce ver
-    python3 teste_servo.py --simulado   # ensaio sem o carro (nao mexe em nada)
+    python3 teste_servo.py              # 0 (esquerda) -> 35 (reto) -> 65 (direita), 2 s em cada, em loop
+    python3 teste_servo.py --ajustar    # so se precisar mudar: a/d = -/+1 grau, A/D = -/+5, q = sai e mostra o angulo
+    python3 teste_servo.py --simulado   # ensaio no PC (nao mexe em nada)
 
-Rode com os MOTORES DE TRACAO DESLIGADOS (este teste nem liga eles) e o carro
-no chao ou na mao, de frente pra voce olhando as rodas da frente.
+E o mesmo teste que voce ja usa (gpiozero.AngularServo no pino 18, pulso 0.5 a 2.5 ms), so que lendo os
+angulos do config.py (SERVO_ESQ_PADRAO / SERVO_CENTRO_PADRAO / SERVO_DIR_PADRAO = 0 / 35 / 65).
+Ctrl+C encerra e volta o servo pro centro.
 
-Teclas (esquerda/direita = do ponto de vista de quem esta SENTADO no carro):
-    a / d      angulo  -1 / +1 grau          (A / D = -5 / +5, maiusculas)
-    c          marca o angulo atual como CENTRO (roda bem reta)
-    l          marca o angulo atual como limite ESQUERDO (roda virada toda pra esquerda)
-    r          marca o angulo atual como limite DIREITO  (roda virada toda pra direita)
-    1 2 3      vai pro esquerdo / centro / direito ja marcados
-    v          demonstracao: esquerdo -> centro -> direito -> centro
-    o          solta o servo (para o pulso: sem zumbido/esquentar)
-    s          salva em dados/servo.json e sai
-    q          sai sem salvar
-
-CUIDADO: va devagar nos limites. Pare ANTES da roda bater no batente da
-direcao: forcar o servo contra o batente esquenta, zumbe e pode quebrar a engrenagem.
-O limite que voce marca ja e o que o carro vai usar como "esterco total".
+Esquerda/direita sao do ponto de vista de quem esta SENTADO no carro. Se as rodas virarem pro lado
+trocado nao precisa mexer em nada: o carro percebe sozinho andando e inverte o volante.
 """
 
 import sys
-import time
+from time import sleep
 
 import config
 import hardware
-
-# Valores com que o teste COMECA toda vez (ja vem marcados; 'c', 'l', 'r' mudam e 's' salva).
-MARCAS_INICIAIS = {"esquerdo": 5.0, "centro": 25.0, "direito": 175.0}
 
 if sys.platform == "win32":
     import msvcrt
@@ -52,121 +38,54 @@ else:
             termios.tcsetattr(fd, termios.TCSADRAIN, antigo)
 
 
-def mostrar(servo, marcas):
-    m = " ".join(f"{k}={'--' if v is None else '%.0f' % v}" for k, v in marcas.items())
-    ang = servo.angulo_atual
-    print(f"\r  angulo {'solto' if ang is None else '%5.1f' % ang}   [{m}]      ",
-          end="", flush=True)
+def loop_fixo(servo):
+    esq, cen, dire = servo.cal["esquerda"], servo.cal["centro"], servo.cal["direita"]
+    try:
+        while True:
+            print(f"Posição: {esq:.0f}° (esquerda)")
+            servo.angulo(esq, forcar=True)
+            sleep(2)
+
+            print(f"Posição: {cen:.0f}° (reto)")
+            servo.angulo(cen, forcar=True)
+            sleep(2)
+
+            print(f"Posição: {dire:.0f}° (direita)")
+            servo.angulo(dire, forcar=True)
+            sleep(2)
+    except KeyboardInterrupt:
+        print("Teste encerrado")
 
 
-def varrer(servo, centro, passo=5.0, alcance=35.0, pausa=0.8):
-    """Varredura lenta em volta do centro de partida, imprimindo cada angulo."""
+def ajustar(servo):
+    ang = float(servo.cal["centro"])
+    servo.angulo(ang, forcar=True)
+    print("a/d = -/+1 grau | A/D = -/+5 | q = sair. Anote o angulo em que a roda fica RETA, na ESQUERDA total e na "
+          "DIREITA total e ponha em config.py (SERVO_CENTRO_PADRAO, SERVO_ESQ_PADRAO, SERVO_DIR_PADRAO).")
     lo, hi = config.SERVO_LIMITE_ABS
-    print(f"\nVarredura: {centro:.0f} -> {centro - alcance:.0f} -> {centro + alcance:.0f} -> {centro:.0f}"
-          f" (passo {passo:.0f} graus). Anote: onde a roda fica reta e onde ela chega no batente.")
-    print("Ctrl+C interrompe.\n")
-    trajeto = []
-    a = centro
-    while a > max(lo, centro - alcance):
-        a -= passo; trajeto.append(a)
-    while a < min(hi, centro + alcance):
-        a += passo; trajeto.append(a)
-    while a > centro:
-        a -= passo; trajeto.append(max(a, centro))
-    servo.angulo(centro, forcar=True)
-    time.sleep(1.0)
-    for a in trajeto:
-        servo.angulo(a, forcar=True)
-        print(f"  servo em {a:5.1f} graus")
-        time.sleep(pausa)
+    try:
+        while True:
+            print(f"\r  angulo {ang:5.1f}   ", end="", flush=True)
+            k = ler_tecla()
+            if k in ("q", "\x03"):
+                break
+            ang += {"a": -1, "d": 1, "A": -5, "D": 5}.get(k, 0)
+            ang = max(lo, min(hi, ang))
+            servo.angulo(ang, forcar=True)
+    except KeyboardInterrupt:
+        pass
+    print(f"\nUltimo angulo: {ang:.0f}")
 
 
 def main():
-    simulado = "--simulado" in sys.argv
-    # Sempre comeca nestes valores (pedido do usuario), ignorando o dados/servo.json salvo.
-    # Pra mudar, edite MARCAS_INICIAIS la em cima ou use as teclas e salve com 's'.
-    cal = {"centro": MARCAS_INICIAIS["centro"], "esquerda": MARCAS_INICIAIS["esquerdo"],
-           "direita": MARCAS_INICIAIS["direito"]}
-    servo = hardware.Servo(simulado=simulado, cal=cal)
-    print(f"Servo no pino BCM {servo.pino} ({servo.modo}). Comecando em: "
-          f"esquerdo={cal['esquerda']:.0f} centro={cal['centro']:.0f} direito={cal['direita']:.0f}")
-    if not hardware.hardware_real():
-        print("(hardware SIMULADO: o servo de verdade nao vai se mexer)")
-    marcas = dict(MARCAS_INICIAIS)
-    confirmou_extremo = False
-    ang = float(MARCAS_INICIAIS["centro"])
-    servo.angulo(ang, forcar=True)
+    servo = hardware.Servo(simulado="--simulado" in sys.argv)
+    print(f"Servo no pino BCM {servo.pino} ({servo.modo}): esquerda {servo.cal['esquerda']:.0f} | "
+          f"reto {servo.cal['centro']:.0f} | direita {servo.cal['direita']:.0f}  [{servo.origem}]")
     try:
-        if "--varrer" in sys.argv:
-            varrer(servo, ang)
-            servo.angulo(ang, forcar=True)
-        print("Teclas" + __doc__.split("Teclas")[1].split("CUIDADO")[0].rstrip())
-        mostrar(servo, marcas)
-        while True:
-            k = ler_tecla()
-            if k in ("q", "\x03"):
-                print("\nSaiu sem salvar.")
-                return
-            elif k == "a": ang -= 1
-            elif k == "d": ang += 1
-            elif k == "A": ang -= 5
-            elif k == "D": ang += 5
-            elif k == "c": marcas["centro"] = ang
-            elif k == "l": marcas["esquerdo"] = ang
-            elif k == "r": marcas["direito"] = ang
-            elif k in ("1", "2", "3"):
-                alvo = {"1": "esquerdo", "2": "centro", "3": "direito"}[k]
-                if marcas[alvo] is not None:
-                    ang = marcas[alvo]
-            elif k == "v":
-                if None in marcas.values():
-                    print("\n  (marque os tres primeiro: l, c, r)")
-                else:
-                    print()
-                    for alvo in ("esquerdo", "centro", "direito", "centro"):
-                        servo.angulo(marcas[alvo], forcar=True)
-                        print(f"  {alvo}: {marcas[alvo]:.0f}")
-                        time.sleep(1.0)
-                    ang = marcas["centro"]
-            elif k == "o":
-                servo.solto(); mostrar(servo, marcas); continue
-            elif k == "s":
-                if None in marcas.values():
-                    print("\n  Falta marcar: " + ", ".join(n for n, v in marcas.items() if v is None))
-                    continue
-                e, c, d = marcas["esquerdo"], marcas["centro"], marcas["direito"]
-                if not (min(e, d) < c < max(e, d)):
-                    print("\n  O centro precisa ficar ENTRE os dois limites. Confira as marcas.")
-                    continue
-                if abs(d - e) < 10:
-                    print("\n  Os limites estao muito proximos (<10 graus). Confira as marcas.")
-                    continue
-                curso = max(abs(c - e), abs(d - c))
-                if curso > config.SERVO_CURSO_MAX and not confirmou_extremo:
-                    print(f"\n  ATENCAO: curso de {curso:.0f} graus de um lado do centro. Direcao de carro "
-                          f"costuma ter 20 a 50. Isso parece marca ERRADA (esquerdo {e:.0f}, centro {c:.0f}, "
-                          f"direito {d:.0f}) e vai forcar o servo no batente.")
-                    print("  Confira com '1','2','3' olhando a roda. Aperte 's' de novo SO se estiver certo.")
-                    confirmou_extremo = True
-                    continue
-                hardware.salvar_servo(c, e, d)
-                print(f"\nSalvo em dados/servo.json: centro {c:.0f} | esquerdo {e:.0f} | direito {d:.0f}")
-                print(f"  esquerda total = {e:.0f} ({abs(c - e):.0f} graus do centro) | "
-                      f"direita total = {d:.0f} ({abs(d - c):.0f} graus do centro)")
-                if abs(abs(c - e) - abs(d - c)) > 8:
-                    print("  Obs.: os lados sao assimetricos; o programa trata cada lado separado.")
-                if e > d:
-                    print("  Obs.: servo 'invertido' (esquerdo > direito): ja esta tratado.")
-                print("  Copie esses numeros pro config.py (SERVO_*_PADRAO) so se quiser um padrao no repositorio.")
-                return
-            else:
-                continue
-            lo, hi = config.SERVO_LIMITE_ABS
-            ang = max(lo, min(hi, ang))
-            servo.angulo(ang, forcar=True)
-            mostrar(servo, marcas)
-    except KeyboardInterrupt:
-        print("\nInterrompido.")
+        if "--ajustar" in sys.argv:
+            ajustar(servo)
+        else:
+            loop_fixo(servo)
     finally:
         servo.fechar()
         hardware.limpar()

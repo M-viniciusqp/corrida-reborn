@@ -87,16 +87,17 @@ def carregar_servo():
     """Devolve (dict com centro/esquerda/direita, origem)."""
     p = {"centro": config.SERVO_CENTRO_PADRAO, "esquerda": config.SERVO_ESQ_PADRAO,
          "direita": config.SERVO_DIR_PADRAO}
-    origem = "config.py (valores de partida - rode teste_servo.py)"
-    try:
-        with open(ARQ_SERVO, "r", encoding="utf-8") as f:
-            salvo = json.load(f)
-        for k in p:
-            if k in salvo:
-                p[k] = float(salvo[k])
-        origem = "dados/servo.json"
-    except (OSError, ValueError):
-        pass
+    origem = (f"angulos fixos do config.py ({p['esquerda']:.0f}/{p['centro']:.0f}/{p['direita']:.0f}) - sem calibrar")
+    if config.SERVO_USAR_ARQUIVO:
+        try:
+            with open(ARQ_SERVO, "r", encoding="utf-8") as f:
+                salvo = json.load(f)
+            for k in p:
+                if k in salvo:
+                    p[k] = float(salvo[k])
+            origem = "dados/servo.json"
+        except (OSError, ValueError):
+            pass
     curso = max(abs(p["centro"] - p["esquerda"]), abs(p["direita"] - p["centro"]))
     if curso > config.SERVO_CURSO_MAX:
         print(f"AVISO: calibracao do servo suspeita ({origem}): curso de {curso:.0f} graus de um "
@@ -131,31 +132,69 @@ def salvar_piso(piso):
 # servo
 # ---------------------------------------------------------------------
 class Servo:
+    """Servo de direcao. Modelo principal: gpiozero.AngularServo (como no teste do usuario):
+        AngularServo(18, min_angle=0, max_angle=180, min_pulse_width=0.0005, max_pulse_width=0.0025)
+    Se o gpiozero nao existir/nao funcionar, cai pro pigpio e depois pro PWM do RPi.GPIO."""
+
     def __init__(self, simulado=False, pino=None, cal=None):
-        """cal: dict centro/esquerda/direita pra IGNORAR o arquivo salvo (servo novo)."""
+        """cal: dict centro/esquerda/direita pra IGNORAR o config (ex.: ensaios)."""
         self.pino = config.SERVO_PIN if pino is None else pino
         self.G = gpio(simulado)
         if cal is not None:
-            self.cal, self.origem = dict(cal), "partida (servo novo)"
+            self.cal, self.origem = dict(cal), "fornecida pelo programa"
         else:
             self.cal, self.origem = carregar_servo()
         self.angulo_atual = None
+        self._gz = None
         self._pi = None
         self._pwm = None
+        self.modo = "simulado"
         if hardware_real():
-            try:
-                import pigpio
-                pi = pigpio.pi()
-                if pi.connected:
-                    self._pi = pi
-            except ImportError:
-                pass
-        if self._pi is None:
+            self._abrir_gpiozero() or self._abrir_pigpio()
+        if self._gz is None and self._pi is None:
             self.G.setup(self.pino, self.G.OUT)
             self._pwm = self.G.PWM(self.pino, 50)
             self._pwm.start(0)
-        self.modo = "pigpio" if self._pi is not None else "RPi.GPIO"
+            self.modo = "RPi.GPIO" if hardware_real() else "simulado"
         self.angulo(self.cal["centro"], forcar=True)
+
+    def _abrir_gpiozero(self):
+        try:
+            from gpiozero import AngularServo
+        except ImportError:
+            return False
+        p0, p1 = config.SERVO_PULSO_US
+        kw = dict(min_angle=0, max_angle=180, min_pulse_width=p0 / 1e6, max_pulse_width=p1 / 1e6)
+        fabrica = None
+        try:                                    # pulso por DMA (sem tremor) se o pigpiod estiver rodando
+            from gpiozero.pins.pigpio import PiGPIOFactory
+            fabrica = PiGPIOFactory()
+        except Exception:
+            fabrica = None
+        try:
+            if fabrica is not None:
+                self._gz = AngularServo(self.pino, pin_factory=fabrica, **kw)
+                self.modo = "gpiozero+pigpio"
+            else:
+                self._gz = AngularServo(self.pino, **kw)
+                self.modo = "gpiozero"
+            return True
+        except Exception as e:
+            print(f"AVISO: gpiozero nao abriu o servo ({e}); tentando outro modo.")
+            self._gz = None
+            return False
+
+    def _abrir_pigpio(self):
+        try:
+            import pigpio
+            pi = pigpio.pi()
+            if pi.connected:
+                self._pi = pi
+                self.modo = "pigpio"
+                return True
+        except ImportError:
+            pass
+        return False
 
     def angulo(self, a, forcar=False):
         lo, hi = config.SERVO_LIMITE_ABS
@@ -164,16 +203,19 @@ class Servo:
                 and abs(a - self.angulo_atual) < config.SERVO_DEADBAND_DEG):
             return self.angulo_atual
         self.angulo_atual = a
-        p0, p1 = config.SERVO_PULSO_US
-        us = p0 + (a / 180.0) * (p1 - p0)
-        if self._pi is not None:
-            self._pi.set_servo_pulsewidth(self.pino, us)
+        if self._gz is not None:
+            self._gz.angle = a
         else:
-            self._pwm.ChangeDutyCycle(us / 20000.0 * 100.0)
+            p0, p1 = config.SERVO_PULSO_US
+            us = p0 + (a / 180.0) * (p1 - p0)
+            if self._pi is not None:
+                self._pi.set_servo_pulsewidth(self.pino, us)
+            elif self._pwm is not None:
+                self._pwm.ChangeDutyCycle(us / 20000.0 * 100.0)
         return a
 
     def virar(self, turn):
-        """turn -1 (esquerda total) .. +1 (direita total), usando a calibracao."""
+        """turn -1 (esquerda total) .. +1 (direita total), usando os angulos esq/centro/dir."""
         turn = max(-1.0, min(1.0, turn))
         c = self.cal["centro"]
         alvo = self.cal["esquerda"] if turn < 0 else self.cal["direita"]
@@ -184,9 +226,14 @@ class Servo:
 
     def solto(self):
         """Para de mandar pulso (servo relaxa, nao esquenta/zumbe)."""
-        if self._pi is not None:
+        if self._gz is not None:
+            try:
+                self._gz.detach()
+            except Exception:
+                pass
+        elif self._pi is not None:
             self._pi.set_servo_pulsewidth(self.pino, 0)
-        else:
+        elif self._pwm is not None:
             self._pwm.ChangeDutyCycle(0)
         self.angulo_atual = None
 
@@ -195,7 +242,9 @@ class Servo:
             self.angulo(self.cal["centro"], forcar=True)
             time.sleep(0.3)
             self.solto()
-            if self._pi is not None:
+            if self._gz is not None:
+                self._gz.close()
+            elif self._pi is not None:
                 self._pi.stop()
             elif self._pwm is not None:
                 self._pwm.stop()

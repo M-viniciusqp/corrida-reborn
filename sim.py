@@ -39,7 +39,8 @@ PAREDE = (120, 125, 130)
 class Pista:
     """Linha central integrada de trechos (comprimento_cm, curvatura 1/cm; + = direita)."""
 
-    def __init__(self, trechos, cones=(), traco=(12.0, 12.0), espelhada=False):
+    def __init__(self, trechos, cones=(), traco=(12.0, 12.0), espelhada=False, largura=None):
+        self.W = float(largura if largura is not None else config.FAIXA_LARGURA_CM)   # largura REAL da faixa
         self.espelhada = espelhada       # continua a ESQUERDA da faixa do carro, pontilhada a direita
         self.cones = [dict(x=c[0], y=c[1]) for c in cones]   # (s_cm, d_cm da faixa A, + direita)
         self.traco = traco
@@ -71,8 +72,8 @@ class Pista:
     def linhas(self):
         """[(offset d, 'continua'|'pontilhada')] da faixa A + vizinha."""
         if self.espelhada:
-            return [(1.5 * W, "continua"), (0.5 * W, "pontilhada"), (-0.5 * W, "continua")]
-        return [(-1.5 * W, "continua"), (-0.5 * W, "pontilhada"), (0.5 * W, "continua")]
+            return [(1.5 * self.W, "continua"), (0.5 * self.W, "pontilhada"), (-0.5 * self.W, "continua")]
+        return [(-1.5 * self.W, "continua"), (-0.5 * self.W, "pontilhada"), (0.5 * self.W, "continua")]
 
 
 class Carro:
@@ -86,13 +87,14 @@ class Carro:
         self.limiar = 0.0               # potencia minima pra se mover (atrito)
         self.invertido = config.ESTERCO_INVERTER   # volante fisico invertido
         self.vies_graus = 0.0           # roda puxa pra um lado mesmo com o comando em 0 (+ = direita)
+        self.ganho_fisico = 1.0         # direcao fraca (<1) ou forte (>1)
 
     def frente(self):
         return self.p + self.Lb * np.array([math.sin(self.psi), math.cos(self.psi)])
 
     def passo(self, turn, speed, dt, fator_v=1.0, atraso=0.12):
         # a direcao FISICA pode estar invertida e/ou puxar pra um lado (centro do servo errado)
-        delta_cmd = math.radians(config.ESTERCO_MAX_GRAUS) * turn
+        delta_cmd = math.radians(config.ESTERCO_MAX_GRAUS) * turn * self.ganho_fisico
         if self.invertido:
             delta_cmd = -delta_cmd
         delta_cmd += math.radians(self.vies_graus)
@@ -186,8 +188,9 @@ def pose_stats(pista, carro, cones_mundo):
     if pista.espelhada:
         d = -d                           # mundo espelhado: as contas de invasao sao simetricas
     meia = config.CARRO_LARGURA_CM / 2.0
-    fora_dir = d + meia - (W / 2.0)           # > 0: passou da continua
-    fora_esq = (-1.5 * W) - (d - meia)        # > 0: passou da continua da outra faixa
+    Wp = pista.W
+    fora_dir = d + meia - (Wp / 2.0)           # > 0: passou da continua
+    fora_esq = (-1.5 * Wp) - (d - meia)        # > 0: passou da continua da outra faixa
     # distancia do cone ao retangulo do carro
     psi = carro.psi
     fw = np.array([math.sin(psi), math.cos(psi)]); r = np.array([math.cos(psi), -math.sin(psi)])
@@ -244,11 +247,16 @@ NOMES = ["reta", "reta_desalinhado", "cone_centro", "cone_direita", "cone_esquer
 
 
 def rodar(nome, ver=False, erro_cam=False, salvar=None, fps=12.0, fator_v=1.0, quiet=False, limiar=0.0,
-          lado="direita", vies=None):
+          lado="direita", vies=None, invertido=None, vies_graus=0.0, ganho_fisico=1.0, largura=None,
+          online=False, verbose_eventos=False):
     pista, kw = cenario(nome)
+    if largura is not None:
+        pista.W = float(largura)
     params = parametros_padrao()
     res = config.CAMERA_RES
     piloto = Piloto(params, res)
+    if online:
+        lado = "direita"           # NENHUMA calibracao previa: o carro assume o padrao e aprende andando
     if lado == "auto":                         # o carro decide sozinho olhando as primeiras imagens
         import autocal
         _rd = Renderizador(CameraChao(params, res), res)
@@ -267,6 +275,10 @@ def rodar(nome, ver=False, erro_cam=False, salvar=None, fps=12.0, fator_v=1.0, q
     rend = Renderizador(cam_real, res)
     carro = Carro(pista, **kw)
     carro.limiar = limiar
+    if invertido is not None:
+        carro.invertido = invertido
+    carro.vies_graus = vies_graus
+    carro.ganho_fisico = ganho_fisico
     cones_mundo = [c["w"] for c in pista.cones]
 
     dt = 1.0 / fps
@@ -311,7 +323,7 @@ def rodar(nome, ver=False, erro_cam=False, salvar=None, fps=12.0, fator_v=1.0, q
         print(f"[{flag}] {nome:18s} {motivo:34s} desvio max {max_err:5.1f}cm  "
               f"medio {sumd / max(n, 1):4.1f}cm  invasao max {max(max_fora, -99):+5.1f}cm  "
               f"folga cone min {('%.1f' % min_folga) if min_folga < 1e8 else '-':>5}cm  t={t:.1f}s")
-        if "-v" in sys.argv:
+        if "-v" in sys.argv or verbose_eventos:
             for te, e in eventos:
                 print(f"       {te:5.1f}s {e}")
     return ok
